@@ -26,7 +26,7 @@ fn main() {
     object["tell"] = crate::common::container::Container::Decimal(12233.2);
     println!("{}", object["tell"]);
 
-    let mut v = json_parser::parser::parse_str(r#"1.2344e-1"#);
+    let v = json_parser::parser::parse_str(r#"1.2344e-1"#);
     let c = v.unwrap();
     println!("{}", c);
 }
