@@ -7,7 +7,7 @@ fn main() {
         "where": 123.98,
         "you": 1.9e2,
         "are": [
-            1,2,3,4,5,6,7,8,9,10000.000987
+            1,2,3,4,5,6,7,8,9,10000.000987,2.99e-7
         ],
         "i'll": {
             "come":  "for",
@@ -26,7 +26,7 @@ fn main() {
     object["tell"] = crate::common::container::Container::Decimal(12233.2);
     println!("{}", object["tell"]);
 
-    let mut v = json_parser::parser::parse_str(r#"1.2344e12"#);
+    let mut v = json_parser::parser::parse_str(r#"1.2344e-1"#);
     let c = v.unwrap();
     println!("{}", c);
 }

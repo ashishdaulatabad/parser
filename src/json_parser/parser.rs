@@ -35,7 +35,7 @@ pub struct Parser {
 macro_rules! read_byte {
     ($parser:ident) => {{
         let chr = $parser.get_next_byte();
-        if chr == Option::None {
+        if chr == None {
             return Result::Error(Error::ParsingError(ParseError::EndOfBufferError));
         }
         chr.unwrap()
@@ -43,7 +43,7 @@ macro_rules! read_byte {
 
     ($parser:ident, $check_buf_error:expr) => {{
         let chr = $parser.get_next_byte();
-        if chr == Option::None && $check_buf_error {
+        if chr == None && $check_buf_error {
             return Result::Error(Error::ParsingError(ParseError::EndOfBufferError));
         }
         chr
@@ -52,10 +52,12 @@ macro_rules! read_byte {
 
 macro_rules! expect_next_bytes {
     ($parser:ident, $( $next_char:expr ),*) => ({
-        $( let next_byte = read_byte!($parser);
+        $( 
+            let next_byte = read_byte!($parser);
             if next_byte != $next_char {
-            return Result::Error(Error::ParsingError(ParseError::UnexpectedTokenError(next_byte as char)));
-        } )*
+                return Result::Error(Error::ParsingError(ParseError::UnexpectedTokenError(next_byte as char)));
+            }
+        )*
     })
 }
 
@@ -90,22 +92,19 @@ macro_rules! equals_in {
 
 macro_rules! get_closing_container {
     ($chr:expr) => {
-        if $chr == b'[' {
-            b']'
-        } else if $chr == b'{' {
-            b'}'
-        } else if $chr == b'(' {
-            b')'
-        } else {
-            b'\0'
+        match $chr {
+            b'[' => b']',
+            b'{' => b'}',
+            b'(' => b')',
+            _ => b'\0'
         }
     };
 }
 
 impl Parser {
     #[inline]
-    fn new(str_stream: &str) -> Parser {
-        Parser {
+    fn new(str_stream: &str) -> Self {
+        Self {
             container: str_stream.as_ptr(),
             curr_byte: b' ',
             offset: 0,
@@ -135,7 +134,7 @@ impl Parser {
             }
             Some(self.curr_byte)
         } else {
-            Option::None
+            None
         }
     }
 
@@ -247,12 +246,12 @@ impl Parser {
                     if self.curr_byte == end_bracket_expected {
                         break;
                     } else {
-                        Result::Error(Error::ParsingError(
+                        return Result::Error(Error::ParsingError(
                             ParseError::ContainerParanthesisMismatchError {
                                 opening_container: end_bracket_expected as char,
                                 closing_container: self.curr_byte as char,
                             },
-                        ))
+                        ));
                     }
                 }
                 b'0'..=b'9' | b'.' | b'-' | b'+' => self.read_number(self.curr_byte, true),
@@ -264,10 +263,7 @@ impl Parser {
                 Result::Ok(array_element) => {
                     array_container.push(array_element);
                 }
-                Result::Error(error_msg) => {
-                    return Result::Error(error_msg);
-                }
-                Result::None => break,
+                _ => break,
             }
             if self.num_read != true {
                 read_byte!(self);
@@ -311,16 +307,15 @@ impl Parser {
             let key = match self.curr_byte {
                 b'\'' | b'\"' => self.read_string_in_quotes(self.curr_byte),
                 b'}' => break,
-                _ => Result::Error(Error::ParsingError(ParseError::UnexpectedTokenError(
-                    self.curr_byte as char,
-                ))),
+                _ => {
+                    return Result::Error(Error::ParsingError(ParseError::UnexpectedTokenError(
+                        self.curr_byte as char,
+                    )));
+                },
             };
             let verification = match key {
                 Result::Ok(val) => val,
-                Result::Error(err_msg) => {
-                    return Result::Error(err_msg);
-                }
-                Result::None => break,
+                _ => break,
             };
             // Skip inverted commas or brackets
             read_byte!(self);
@@ -341,12 +336,12 @@ impl Parser {
                             },
                         ));
                     } else {
-                        Result::Error(Error::ParsingError(
+                        return Result::Error(Error::ParsingError(
                             ParseError::ContainerParanthesisMismatchError {
                                 opening_container: '{',
                                 closing_container: self.curr_byte as char,
                             },
-                        ))
+                        ));
                     }
                 }
                 b't' => {
@@ -361,19 +356,20 @@ impl Parser {
                     expect_next_bytes!(self, b'u', b'l', b'l');
                     Result::Ok(Container::Null)
                 }
-                b'0'..=b'9' | b'.' | b'-' | b'+' => self.read_number(self.curr_byte, true),
-                _ => Result::Error(Error::ParsingError(ParseError::UnexpectedTokenError(
-                    self.curr_byte as char,
-                ))),
+                b'0'..=b'9' | 
+                b'.' | b'-' |
+                b'+' => self.read_number(self.curr_byte, true),
+                _ => {
+                    return Result::Error(Error::ParsingError(ParseError::UnexpectedTokenError(
+                        self.curr_byte as char,
+                    )));
+                },
             };
             match assoc_value {
                 Result::Ok(val) => {
                     object_container.insert(verification.as_string().unwrap(), val);
-                }
-                Result::Error(err) => {
-                    return Result::Error(err);
-                }
-                Result::None => break,
+                },
+                _ => break,
             }
             if self.num_read != true {
                 read_byte!(self);
@@ -408,23 +404,37 @@ impl Parser {
     fn read_number(&mut self, byte_read: u8, check_abrupt_end: bool) -> Result<Container> {
         let mut read_dot = byte_read == b'.';
         let sign_read = if byte_read == b'-' { b'-' } else { b'+' };
+        let mut prev_byte = byte_read;
         let mut read_exp = false;
         let mut sign_exp: bool = false;
         let start = self.offset - 1;
         loop {
             match read_byte!(self, check_abrupt_end) {
-                Some(b'0'..=b'9') | Some(b'.') | Some(b'e') | Some(b'E') => {
+                Some(b'0'..=b'9') | Some(b'.') | Some(b'e') | Some(b'E') | Some(b'+') | Some(b'-') => {
                     if read_dot && self.curr_byte == b'.' {
                         return Result::Error(Error::ParsingError(
                             ParseError::InvalidNumberParseError(self.curr_byte as char),
                         ));
-                    } else if read_exp && (equals_in!(b'.', b'e', b'E')) {
+                    } else if read_exp && (equals_in!(self.curr_byte, b'.', b'e', b'E')) {
+                        return Result::Error(Error::ParsingError(
+                            ParseError::InvalidNumberParseError(self.curr_byte as char),
+                        ));
+                    }
+
+                    if read_exp && 
+                        !equals_in!(prev_byte, b'e', b'E') && 
+                        equals_in!(self.curr_byte, b'+', b'-') {
                         return Result::Error(Error::ParsingError(
                             ParseError::InvalidNumberParseError(self.curr_byte as char),
                         ));
                     }
 
                     read_exp = read_exp || equals_in!(self.curr_byte, b'e', b'E');
+                    sign_exp = sign_exp || (
+                        read_exp && 
+                        equals_in!(prev_byte, b'e', b'E') && 
+                        equals_in!(self.curr_byte, b'-', b'+')
+                    );
                     read_dot = read_dot || self.curr_byte == b'.' || read_exp;
                 }
                 Some(b' ') | Some(09..=13) | Some(b',') | Some(b']') | Some(b'}') | Some(b')') | None => {
@@ -437,6 +447,7 @@ impl Parser {
                     ));
                 }
             }
+            prev_byte = self.curr_byte;
         }
         unsafe {
             if read_dot || read_exp {
