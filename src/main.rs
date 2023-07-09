@@ -20,7 +20,7 @@ fn main() {
             ]
         }
     }"#);
-    let object: &mut crate::common::container::Container = pr.unwrap_mut();
+    let object: &mut crate::common::container::Container = &mut pr.unwrap();
     println!("{}", object);
     println!("{}", object["tell"]);
     object["tell"] = crate::common::container::Container::Decimal(12233.2);
