@@ -167,6 +167,7 @@ impl Container {
     pub fn new_set() -> Self {
         Self::Set(HashSet::new())
     }
+
     // Array: Push an item into array or an element into set:
     // Returns false if not inserted
     // Permissible for array type only
@@ -177,8 +178,6 @@ impl Container {
                 value.push(val);
                 true
             }
-            // Set push
-            // To do: Define hash for HashSet
             Self::Set(ref mut value) => value.insert(val),
             _ => {
                 println!("Error: The storage type should be of array or a set for pushing values.");
@@ -401,10 +400,7 @@ impl Container {
     define_type_checks!(Set, is_set);
 
     pub fn is_null(&self) -> bool {
-        match *self {
-            Self::Null => true,
-            _ => false,
-        }
+        *self == Self::Null
     }
 
     /// Returns the length of an object
@@ -414,7 +410,7 @@ impl Container {
             Self::Object(ref value) => value.len(),
             Self::Set(ref value) => value.len(),
             Self::Str(ref value) => value.len(),
-            _ => 1usize,
+            _ => 1,
         }
     }
 }
@@ -524,7 +520,6 @@ impl IndexMut<&str> for Container {
                 value.get_mut(&key).unwrap()
             }
             _ => {
-                // Log: Change into array
                 *self = Self::new_object();
                 self.insert(idx.to_owned(), Self::Null);
                 &mut self[idx]
