@@ -396,9 +396,12 @@ impl Parser {
         let mut prev_byte = byte_read;
         let mut read_exp = false;
         let mut sign_exp: bool = false;
+        let mut abrupt_end = false;
         let start = self.offset - 1;
+        let mut curr_char: Option<u8>;
         loop {
-            match read_byte!(self, check_abrupt_end) {
+            curr_char = read_byte!(self, check_abrupt_end);
+            match curr_char {
                 Some(b'0'..=b'9') | Some(b'.') | Some(b'e') | Some(b'E') | Some(b'+') | Some(b'-') => {
                     if read_dot && self.curr_byte == b'.' {
                         return Err(Error::ParsingError(
@@ -428,6 +431,7 @@ impl Parser {
                 }
                 Some(b' ') | Some(09..=13) | Some(b',') | Some(b']') | Some(b'}') | Some(b')') | None => {
                     self.num_read = true;
+                    abrupt_end = curr_char == None;
                     break;
                 }
                 _ => {
@@ -443,7 +447,7 @@ impl Parser {
                 Ok(Container::Decimal(
                     std::str::from_utf8_unchecked(std::slice::from_raw_parts(
                         self.container.offset(start as isize),
-                        self.offset - start - 1 + if !check_abrupt_end { 1 } else { 0 },
+                        self.offset - start - 1 + if abrupt_end { 1 } else { 0 },
                     ))
                     .parse::<f64>()
                     .unwrap(),
@@ -453,7 +457,7 @@ impl Parser {
                     Ok(Container::Number(
                         std::str::from_utf8_unchecked(std::slice::from_raw_parts(
                             self.container.offset(start as isize),
-                            self.offset - start - 1 + if !check_abrupt_end { 1 } else { 0 },
+                            self.offset - start - 1 + if abrupt_end { 1 } else { 0 },
                         ))
                         .parse::<i64>()
                         .unwrap(),
@@ -462,7 +466,7 @@ impl Parser {
                     Ok(Container::Unsigned(
                         std::str::from_utf8_unchecked(std::slice::from_raw_parts(
                             self.container.offset(start as isize),
-                            self.offset - start - 1 + if !check_abrupt_end { 1 } else { 0 },
+                            self.offset - start - 1 + if abrupt_end { 1 } else { 0 },
                         ))
                         .parse::<u64>()
                         .unwrap(),
