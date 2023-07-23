@@ -224,111 +224,85 @@ impl Container {
                         value
                             .iter()
                             .map(|element| element.dump_object(indent, indent_size, white_space))
-                            .collect::<Vec<String>>()
-                            .join(", ")
+                            .enumerate().fold(String::from(""), |prev, (idx, curr)| {
+                                prev + if idx == 0 { "" } else { "," } + &curr
+                            })
                     )
                 } else {
-                    let mut space: String = (0..indent_size).map(|_| ' ').collect();
                     if value.len() == 0 {
                         "[]".to_string()
                     } else {
-                        space += white_space;
+                        let space = white_space.to_owned() + 
+                            (0..indent_size).map(|_| ' ').collect::<String>().as_str();
                         format!(
                             "[\n{}\n{}]",
                             value
                                 .iter()
                                 .map(|element| format!(
-                                    "{}{}",
-                                    space,
-                                    element.dump_object(indent, indent_size, &space)
-                                ))
-                                .collect::<Vec<String>>()
-                                .join(",\n"),
+                                    "{}{}", space, element.dump_object(indent, indent_size, &space)
+                                )).enumerate().fold(String::from(""), |prev, (idx, curr)| {
+                                    prev + if idx == 0 { "" } else { ",\n" } + &curr
+                                }),
                             white_space
                         )
                     }
                 }
             }
-            Self::Object(ref value) => {
-                if indent == false {
-                    let (mut object_str, mut index) = (String::from("{"), 0);
-                    for (key, val) in value {
-                        object_str.push_str(&format!(
-                            "\"{}\":{}",
-                            key,
-                            val.dump_object(indent, indent_size, white_space)
-                        ));
-                        index += 1;
-                        if index != value.len() {
-                            object_str.push(',');
-                        }
-                    }
-                    object_str.push('}');
-                    object_str
+            Self::Object(ref map) => {
+                if !indent {
+                    format!(
+                        "{{{}}}",
+                        map.iter().map(|(key, val)| format!(
+                            "{:?}:{}", key, val.dump_object(indent, indent_size, white_space)
+                        )).enumerate().fold(String::from(""), |prev, (idx, curr)| {
+                            prev + if idx == 0 { "" } else { "," } + &curr
+                        })
+                    )
                 } else {
-                    if value.len() == 0 {
+                    if map.len() == 0 {
                         "{}".to_string()
                     } else {
-                        let (
-                            mut object_str, 
-                            mut space, 
-                            mut index
-                        ) = (
-                            String::from("{\n"),
-                            white_space.to_string(),
-                            0
-                        );
-                        space += (0..indent_size)
-                            .map(|_| ' ')
-                            .collect::<String>().as_str();
+                        let space = white_space.to_owned() + 
+                            (0..indent_size).map(|_| ' ').collect::<String>().as_str();
                         // space += c;
-
-                        for (key, val) in value {
-                            object_str.push_str(&space);
-                            object_str.push_str(&format!(
-                                "\"{}\": {}",
-                                key,
-                                val.dump_object(indent, indent_size, &space)
-                            ));
-                            index += 1;
-                            if index != value.len() {
-                                object_str.push_str(",\n");
-                            }
-                        }
-                        object_str.push_str(&format!("\n{}}}", white_space));
-                        object_str
+                        format!(
+                            "{{{}\n{}}}",
+                            map.iter().map(|(key, val)| format!(
+                                "{}{:?}: {}", space, key, val.dump_object(indent, indent_size, &space)
+                            )).enumerate().fold(String::from(""), |prev, (idx, curr)| {
+                                prev + if idx == 0 { "\n" } else { ",\n" } + &curr
+                            }),
+                            white_space
+                        )
                     }
                 }
             }
             Self::Set(ref value) => {
-                if indent == false {
+                if !indent {
                     format!(
                         "({})",
                         value
                             .iter()
                             .map(|element| element.dump_object(indent, indent_size, white_space))
-                            .collect::<Vec<String>>()
-                            .join(", ")
+                            .enumerate().fold(String::from(""), |prev, (idx, curr)| {
+                                prev + if idx == 0 { "" } else { "," } + &curr
+                            })
                     )
                 } else {
-                    let mut space: String = (0..indent_size)
-                        .map(|_| ' ')
-                        .collect::<String>();
                     if value.len() == 0 {
                         "()".to_string()
                     } else {
-                        space += white_space;
+                        let space = white_space.to_owned() + 
+                            (0..indent_size).map(|_| ' ').collect::<String>().as_str();
                         format!(
                             "(\n{}\n{})",
                             value
                                 .iter()
                                 .map(|element| format!(
-                                    "{}{}",
-                                    space,
-                                    element.dump_object(indent, indent_size, &space)
-                                ))
-                                .collect::<Vec<String>>()
-                                .join(",\n"),
+                                    "{}{}", space, element.dump_object(indent, indent_size, &space)
+                                )).enumerate().fold(String::from(""), |prev, (idx, curr)| {
+                                    prev + if idx == 0 { "" } else { ",\n" } + &curr
+                                }),
                             white_space
                         )
                     }
@@ -338,7 +312,7 @@ impl Container {
             Self::Unsigned(value) => value.to_string(),
             Self::Boolean(value) => value.to_string(),
             Self::Decimal(value) => value.to_string(),
-            Self::Str(ref value) => format!("\"{}\"", value.to_string()),
+            Self::Str(ref value) => format!("{:?}", value),
             Self::Null => "null".to_string(),
         }
     }

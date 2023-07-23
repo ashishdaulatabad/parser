@@ -103,7 +103,7 @@ macro_rules! get_closing_container {
 }
 
 impl Parser {
-    #[inline]
+    #[inline(always)]
     fn new(str_stream: &str) -> Self {
         Self {
             container: str_stream.as_ptr(),
@@ -141,6 +141,7 @@ impl Parser {
 
     /// Parsing bytestream
     /// Parse the file from an input stream: taking unsafe route
+    #[inline(always)]
     pub fn parse_str(&mut self) -> Result<Container, Error> {
         skip_whitespaces!(self);
         match self.curr_byte {
