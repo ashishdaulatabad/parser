@@ -12,6 +12,7 @@ use crate::common::error::ParseError;
 
 /// - JSON parsing
 /// - Binary Data Parsing (where integers are of fixed 4 bytes)
+/// 
 /// Main instance of Parser.
 ///
 /// This is invoked when a user requests loading into memory, called via
@@ -170,7 +171,7 @@ impl Parser {
         // Current byte is a quote, read and move to next one
         // let mut str_result_container: String = String::from("");
         let mut start: usize = self.offset;
-        let mut final_string = "".to_string();
+        let mut final_string = "".to_owned();
         loop {
             match read_byte!(self) {
                 // Handle this by storing current slice and create a new slice again.
@@ -224,6 +225,7 @@ impl Parser {
         } else {
             Container::new_set()
         };
+
         'parsing_array: loop {
             read_byte!(self);
             skip_whitespaces!(self);
@@ -395,9 +397,7 @@ impl Parser {
         let mut read_dot = byte_read == b'.';
         let sign_read = if byte_read == b'-' { b'-' } else { b'+' };
         let mut prev_byte = byte_read;
-        let mut read_exp = false;
-        let mut sign_exp: bool = false;
-        let mut abrupt_end = false;
+        let (mut read_exp, mut sign_exp, mut abrupt_end) = (false, false, false);
         let start = self.offset - 1;
         let mut curr_char: Option<u8>;
         loop {

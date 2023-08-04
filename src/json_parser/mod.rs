@@ -1,4 +1,5 @@
 pub mod parser;
+pub mod test;
 
 #[macro_export]
 macro_rules! object {
