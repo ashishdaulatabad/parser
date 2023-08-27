@@ -5,11 +5,7 @@ pub mod test;
 macro_rules! object {
     ([$($elem:tt),*]) => {{
         use crate::common::container::Container;
-        let mut arr: Vec<Container> = Vec::new();
-        $(
-            arr.push(Container::Str($elem.to_owned()));
-        )*
-        Container::Array(arr)
+        Container::Array(vec![$( Container::Str($elem.to_owned()) ),*])
     }};
     ($str:expr) => {{
         json_parser::parser::parse_str($str).unwrap()

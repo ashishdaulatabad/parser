@@ -1,10 +1,9 @@
 use std::fs;
 
-use std::result::Result;
 use crate::common::container::Container;
 use crate::common::error::Error;
 use crate::common::error::ParseError;
-// use crate::common::Result;
+use std::result::Result;
 
 /// Single-threaded parsing module, with an intent to parse the
 /// files faster with handling run-time errors (hopefully), considering two modes
@@ -12,7 +11,7 @@ use crate::common::error::ParseError;
 
 /// - JSON parsing
 /// - Binary Data Parsing (where integers are of fixed 4 bytes)
-/// 
+///
 /// Main instance of Parser.
 ///
 /// This is invoked when a user requests loading into memory, called via
@@ -36,28 +35,21 @@ pub struct Parser {
 
 macro_rules! read_byte {
     ($parser:ident) => {{
-        let chr = $parser.get_next_byte();
-        if chr == None {
-            return Err(Error::ParsingError(ParseError::EndOfBufferError));
-        }
-        chr.unwrap()
-    }};
-
-    ($parser:ident, $check_buf_error:expr) => {{
-        let chr = $parser.get_next_byte();
-        if chr == None && $check_buf_error {
-            return Err(Error::ParsingError(ParseError::EndOfBufferError));
-        }
-        chr
+        $parser.get_next_byte()
     }};
 }
 
 macro_rules! expect_next_bytes {
     ($parser:ident, $( $next_char:expr ),*) => ({
-        $( 
-            let next_byte = read_byte!($parser);
-            if next_byte != $next_char {
-                return Err(Error::ParsingError(ParseError::UnexpectedTokenError(next_byte as char)));
+        $(
+            if let Some(d) = read_byte!($parser) {
+                if d != $next_char {
+                    return Err(Error::ParsingError(ParseError::UnexpectedTokenError(
+                        d as char, 
+                        $parser.curr_line, 
+                        $parser.curr_column
+                    )));
+                }
             }
         )*
     })
@@ -65,13 +57,8 @@ macro_rules! expect_next_bytes {
 
 macro_rules! skip_whitespaces {
     ($parser:ident) => {{
-        loop {
-            match $parser.curr_byte {
-                b' ' | 09..=13 => {
-                    read_byte!($parser);
-                }
-                _ => break,
-            }
+        while let Some(b' ' | 9..=13) = Some($parser.curr_byte) {
+            read_byte!($parser);
         }
     }};
 }
@@ -81,6 +68,8 @@ macro_rules! assert_curr_byte {
         if $parser.curr_byte != $byte_val {
             return Err(Error::ParsingError(ParseError::UnexpectedTokenError(
                 $parser.curr_byte as char,
+                $parser.curr_line,
+                $parser.curr_column,
             )));
         }
     };
@@ -88,7 +77,11 @@ macro_rules! assert_curr_byte {
 
 macro_rules! equals_in {
     ($compare: expr, $( $char: expr ),*) => {
-        $( $compare == $char) || *
+        if let Some($ ( $char )|* ) = Some($compare) {
+            true
+        } else {
+            false
+        }
     };
 }
 
@@ -98,12 +91,13 @@ macro_rules! get_closing_container {
             b'[' => b']',
             b'{' => b'}',
             b'(' => b')',
-            _ => b'\0'
+            _ => b'\0',
         }
     };
 }
 
 impl Parser {
+    /// Creates a new JSON parser.
     #[inline(always)]
     fn new(str_stream: &str) -> Self {
         Self {
@@ -120,12 +114,12 @@ impl Parser {
     /// Get the next byte from the buffer string
     /// Returns none if length exceeds the length of buffer,
     ///
-    /// Returns Value wrapped with Option if exist.
+    /// Returns `Option<u8>`.
     #[inline]
     fn get_next_byte(&mut self) -> Option<u8> {
         if self.offset < self.len {
             unsafe {
-                self.curr_byte = *self.container.offset(self.offset as isize);
+                self.curr_byte = *self.container.add(self.offset);
             }
             self.offset += 1;
             if self.curr_byte == b'\n' {
@@ -146,27 +140,20 @@ impl Parser {
     pub fn parse_str(&mut self) -> Result<Container, Error> {
         skip_whitespaces!(self);
         match self.curr_byte {
-            b'\'' | b'"' => {
-                self.read_string_in_quotes(self.curr_byte)
-            },
-            b'[' | b'(' => {
-                self.read_array_or_set(get_closing_container!(self.curr_byte))
-            },
-            b'{' => {
-                self.read_objects()
-            },
-            b'0'..=b'9' | b'+' | b'-' => {
-                self.read_number(self.curr_byte, false)
-            },
-            _ => {
-                Err(Error::ParsingError(ParseError::UnexpectedTokenError(self.curr_byte as char)))
-            },
+            b'\'' | b'"' => self.read_string_in_quotes(self.curr_byte),
+            b'[' | b'(' => self.read_array_or_set(get_closing_container!(self.curr_byte)),
+            b'{' => self.read_objects(),
+            b'0'..=b'9' | b'+' | b'-' => self.read_number(self.curr_byte),
+            _ => Err(Error::ParsingError(ParseError::UnexpectedTokenError(
+                self.curr_byte as char,
+                self.curr_line,
+                self.curr_column,
+            ))),
         }
     }
 
     /// Read string values that are stored
     ///
-    /// TODO: to perform escaped quotes handling
     fn read_string_in_quotes(&mut self, end_quote_expected: u8) -> Result<Container, Error> {
         // Current byte is a quote, read and move to next one
         // let mut str_result_container: String = String::from("");
@@ -175,11 +162,11 @@ impl Parser {
         loop {
             match read_byte!(self) {
                 // Handle this by storing current slice and create a new slice again.
-                b'\\' => {
+                Some(b'\\') => {
                     unsafe {
-                        final_string.push_str(&std::str::from_utf8_unchecked(
+                        final_string.push_str(std::str::from_utf8_unchecked(
                             std::slice::from_raw_parts(
-                                self.container.offset(start as isize),
+                                self.container.add(start),
                                 self.offset - start - 1,
                             ),
                         ));
@@ -198,12 +185,12 @@ impl Parser {
                     }
                     start = self.offset;
                 }
-                b'\'' | b'"' => {
+                Some(b'\'' | b'"') => {
                     if self.curr_byte == end_quote_expected {
                         unsafe {
-                            final_string.push_str(&std::str::from_utf8_unchecked(
+                            final_string.push_str(std::str::from_utf8_unchecked(
                                 std::slice::from_raw_parts(
-                                    self.container.offset(start as isize),
+                                    self.container.add(start),
                                     self.offset - start - 1,
                                 ),
                             ));
@@ -217,7 +204,7 @@ impl Parser {
         Ok(Container::Str(final_string))
     }
 
-    /// Read string values that are stored
+    /// Parse values to store in an array
     fn read_array_or_set(&mut self, end_bracket_expected: u8) -> Result<Container, Error> {
         // Current byte is a quote, read and move to next one
         let mut array_container: Container = if end_bracket_expected == b']' {
@@ -246,30 +233,32 @@ impl Parser {
                     Ok(Container::Null)
                 }
                 b']' | b')' | b'}' => {
-                    // End of current array/set
                     if self.curr_byte == end_bracket_expected {
                         break;
                     } else {
-                        return Err(Error::ParsingError(
+                        Err(Error::ParsingError(
                             ParseError::ContainerParanthesisMismatchError {
                                 opening_container: end_bracket_expected as char,
                                 closing_container: self.curr_byte as char,
                             },
-                        ));
+                        ))
                     }
                 }
-                b'0'..=b'9' | b'.' | b'-' | b'+' => self.read_number(self.curr_byte, true),
+                b'0'..=b'9' | b'.' | b'-' | b'+' => self.read_number(self.curr_byte),
                 _ => Err(Error::ParsingError(ParseError::UnexpectedTokenError(
                     self.curr_byte as char,
+                    self.curr_line,
+                    self.curr_column,
                 ))),
-            };
-            array_container.push(curr_container?);
+            }?;
+            array_container.push(curr_container);
 
-            if self.num_read != true {
+            if !self.num_read {
                 read_byte!(self);
             } else {
                 self.num_read = false;
             }
+
             skip_whitespaces!(self);
             match self.curr_byte {
                 b',' => continue 'parsing_array,
@@ -288,6 +277,8 @@ impl Parser {
                 _ => {
                     return Err(Error::ParsingError(ParseError::UnexpectedTokenError(
                         self.curr_byte as char,
+                        self.curr_line,
+                        self.curr_column,
                     )));
                 }
             }
@@ -297,7 +288,6 @@ impl Parser {
 
     /// Parsing through the object.
     fn read_objects(&mut self) -> Result<Container, Error> {
-        // println!("In here");
         let mut object_container = Container::new_object();
         'parsing_objects: loop {
             // First: read the key
@@ -306,13 +296,13 @@ impl Parser {
             let verification = match self.curr_byte {
                 b'\'' | b'\"' => self.read_string_in_quotes(self.curr_byte),
                 b'}' => break,
-                _ => {
-                    return Err(Error::ParsingError(ParseError::UnexpectedTokenError(
-                        self.curr_byte as char,
-                    )));
-                },
+                _ => Err(Error::ParsingError(ParseError::UnexpectedTokenError(
+                    self.curr_byte as char,
+                    self.curr_line,
+                    self.curr_column,
+                ))),
             }?;
-            
+
             // Skip inverted commas or brackets
             read_byte!(self);
             skip_whitespaces!(self);
@@ -326,18 +316,18 @@ impl Parser {
                 b'[' | b'(' => self.read_array_or_set(get_closing_container!(self.curr_byte)),
                 b']' | b')' | b'}' => {
                     if self.curr_byte == b'}' {
-                        return Err(Error::ParsingError(
+                        Err(Error::ParsingError(
                             ParseError::InvalidKeyValueFormatError {
                                 reading_key: verification.as_string().unwrap(),
                             },
-                        ));
+                        ))
                     } else {
-                        return Err(Error::ParsingError(
+                        Err(Error::ParsingError(
                             ParseError::ContainerParanthesisMismatchError {
                                 opening_container: '{',
                                 closing_container: self.curr_byte as char,
                             },
-                        ));
+                        ))
                     }
                 }
                 b't' => {
@@ -352,23 +342,23 @@ impl Parser {
                     expect_next_bytes!(self, b'u', b'l', b'l');
                     Ok(Container::Null)
                 }
-                b'0'..=b'9' | 
-                b'.' | b'-' |
-                b'+' => self.read_number(self.curr_byte, true),
-                _ => {
-                    return Err(Error::ParsingError(ParseError::UnexpectedTokenError(
-                        self.curr_byte as char,
-                    )));
-                },
+                b'0'..=b'9' | b'.' | b'-' | b'+' => self.read_number(self.curr_byte),
+                _ => Err(Error::ParsingError(ParseError::UnexpectedTokenError(
+                    self.curr_byte as char,
+                    self.curr_line,
+                    self.curr_column,
+                ))),
             };
             object_container.insert(verification.as_string().unwrap(), assoc_value?);
-           
-            if self.num_read != true {
+
+            if !self.num_read {
                 read_byte!(self);
             } else {
                 self.num_read = false;
             }
+
             skip_whitespaces!(self);
+
             match self.curr_byte {
                 b',' => continue 'parsing_objects,
                 b'}' => break,
@@ -379,101 +369,81 @@ impl Parser {
                             closing_container: self.curr_byte as char,
                         },
                     ));
-                } // End of current object
+                }
                 _ => {
                     return Err(Error::ParsingError(ParseError::UnexpectedTokenError(
                         self.curr_byte as char,
+                        self.curr_line,
+                        self.curr_column,
                     )));
                 }
             }
         }
-        // println!("Ret");
+
         Ok(object_container)
     }
 
     /// Read a number from given input
     /// Returns Error if an unexpected token occurs.
-    fn read_number(&mut self, byte_read: u8, check_abrupt_end: bool) -> Result<Container, Error> {
-        let mut read_dot = byte_read == b'.';
-        let sign_read = if byte_read == b'-' { b'-' } else { b'+' };
-        let mut prev_byte = byte_read;
-        let (mut read_exp, mut sign_exp, mut abrupt_end) = (false, false, false);
-        let start = self.offset - 1;
-        let mut curr_char: Option<u8>;
+    fn read_number(&mut self, byte_read: u8) -> Result<Container, Error> {
+        let (mut read_dot, sign_read, mut prev_byte) = (
+            byte_read == b'.',
+            if byte_read == b'-' { b'-' } else { b'+' },
+            byte_read,
+        );
+        let abrupt_end;
+        let (mut read_exp, mut sign_exp, start) = (false, false, self.offset - 1);
+
         loop {
-            curr_char = read_byte!(self, check_abrupt_end);
-            match curr_char {
-                Some(b'0'..=b'9') | Some(b'.') | Some(b'e') | Some(b'E') | Some(b'+') | Some(b'-') => {
-                    if read_dot && self.curr_byte == b'.' {
-                        return Err(Error::ParsingError(
-                            ParseError::InvalidNumberParseError(self.curr_byte as char),
-                        ));
-                    } else if read_exp && (equals_in!(self.curr_byte, b'.', b'e', b'E')) {
-                        return Err(Error::ParsingError(
-                            ParseError::InvalidNumberParseError(self.curr_byte as char),
-                        ));
+            match read_byte!(self) {
+                Some(b'0'..=b'9' | b'.' | b'e' | b'E' | b'+' | b'-') => {
+                    if (read_dot && self.curr_byte == b'.')
+                        || (read_exp && (equals_in!(self.curr_byte, b'.', b'e', b'E')))
+                    {
+                        return Err(Error::ParsingError(ParseError::InvalidNumberParseError(
+                            self.curr_byte as char,
+                        )));
                     }
 
-                    if read_exp && 
-                        !equals_in!(prev_byte, b'e', b'E') && 
-                        equals_in!(self.curr_byte, b'+', b'-') {
-                        return Err(Error::ParsingError(
-                            ParseError::InvalidNumberParseError(self.curr_byte as char),
-                        ));
+                    if read_exp
+                        && !equals_in!(prev_byte, b'e', b'E')
+                        && equals_in!(self.curr_byte, b'+', b'-')
+                    {
+                        return Err(Error::ParsingError(ParseError::InvalidNumberParseError(
+                            self.curr_byte as char,
+                        )));
                     }
 
-                    read_exp = read_exp || equals_in!(self.curr_byte, b'e', b'E');
-                    sign_exp = sign_exp || (
-                        read_exp && 
-                        equals_in!(prev_byte, b'e', b'E') && 
-                        equals_in!(self.curr_byte, b'-', b'+')
-                    );
-                    read_dot = read_dot || self.curr_byte == b'.' || read_exp;
+                    read_exp |= equals_in!(self.curr_byte, b'e', b'E');
+                    sign_exp |= read_exp
+                        && equals_in!(prev_byte, b'e', b'E')
+                        && equals_in!(self.curr_byte, b'-', b'+');
+                    read_dot |= read_exp || self.curr_byte == b'.';
                 }
-                Some(b' ') | Some(09..=13) | Some(b',') | Some(b']') | Some(b'}') | Some(b')') | None => {
-                    self.num_read = true;
-                    abrupt_end = curr_char == None;
+                val @ Some(b' ' | 9..=13 | b',' | b']' | b'}' | b')') | val @ None => {
+                    (self.num_read, abrupt_end) = (true, val.is_none());
                     break;
                 }
                 _ => {
-                    return Err(Error::ParsingError(
-                        ParseError::InvalidNumberParseError(self.curr_byte as char),
-                    ));
+                    return Err(Error::ParsingError(ParseError::InvalidNumberParseError(
+                        self.curr_byte as char,
+                    )));
                 }
             }
             prev_byte = self.curr_byte;
         }
-        unsafe {
-            if read_dot || read_exp {
-                Ok(Container::Decimal(
-                    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-                        self.container.offset(start as isize),
-                        self.offset - start - 1 + if abrupt_end { 1 } else { 0 },
-                    ))
-                    .parse::<f64>()
-                    .unwrap(),
-                ))
-            } else {
-                if sign_read == b'-' {
-                    Ok(Container::Number(
-                        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-                            self.container.offset(start as isize),
-                            self.offset - start - 1 + if abrupt_end { 1 } else { 0 },
-                        ))
-                        .parse::<i64>()
-                        .unwrap(),
-                    ))
-                } else {
-                    Ok(Container::Unsigned(
-                        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-                            self.container.offset(start as isize),
-                            self.offset - start - 1 + if abrupt_end { 1 } else { 0 },
-                        ))
-                        .parse::<u64>()
-                        .unwrap(),
-                    ))
-                }
-            }
+        let str_slice = unsafe {
+            std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+                self.container.add(start),
+                self.offset - start - 1 + if abrupt_end { 1 } else { 0 },
+            ))
+        };
+        if read_dot || read_exp {
+            Ok(Container::Decimal(str_slice.parse::<f64>().unwrap()))
+        } else if sign_read == b'-' {
+            Ok(Container::Number(str_slice.parse::<i64>().unwrap()))
+        } else {
+            Ok(Container::Unsigned(str_slice.parse::<u64>().unwrap()))
         }
     }
 }
@@ -489,7 +459,7 @@ pub fn read_file_as_bytes(filename: &str) -> Result<Container, Error> {
 /// For testing purpose: as it might be fastest
 #[inline(always)]
 pub fn read_str(input_str: &str) -> Result<Container, Error> {
-    parse_str(&input_str)
+    parse_str(input_str)
 }
 /// Parsing bytestream
 /// Parse the file from an input stream: taking unsafe route

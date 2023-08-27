@@ -4,7 +4,8 @@ mod json_parser;
 use json_parser::parser::parse_str;
 
 fn main() {
-    let pr = parse_str(r#"{
+    let pr = parse_str(
+        r#"{
         "tell": "me",
         "where": 123.98,
         "you": 1.9e2,
@@ -21,22 +22,17 @@ fn main() {
                 { "eof": null }
             ]
         }
-    }"#);
+    }"#,
+    );
     let object: &mut crate::common::container::Container = &mut pr.unwrap();
     println!("{}", object);
     println!("{}", object["tell"]);
     object["tell"] = crate::common::container::Container::Decimal(12233.2);
     println!("{}", object["tell"]);
 
-    let v = object!(r#"[false, 1.2344e-1] "#);
+    let v = object!(r#"1.234455"#);
     println!("{}", v);
-    let another = object!(
-        [
-            "some",
-            "element",
-            "are"
-        ]
-    );
+    let another = object!(["some", "element", "are"]);
 
     println!("{}", another);
 }

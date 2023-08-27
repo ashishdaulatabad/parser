@@ -2,7 +2,7 @@
 #[derive(Debug, Clone)]
 pub enum ParseError {
     /// Raised whenever a certain token is not accepted
-    UnexpectedTokenError(char),
+    UnexpectedTokenError(char, usize, usize),
     /// Raised whenever parser reaches the end of the
     /// buffer without proper handling, but might allow
     /// creating the object even after failure.
@@ -22,9 +22,13 @@ pub enum ParseError {
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ParseError::UnexpectedTokenError(chr) => {
-                f.write_str(format!("Unexpected character found: {}", chr).as_str())
-            }
+            ParseError::UnexpectedTokenError(chr, line, col) => f.write_str(
+                format!(
+                    "Unexpected character found: {} at line {}, col: {}",
+                    chr, line, col
+                )
+                .as_str(),
+            ),
             ParseError::ContainerParanthesisMismatchError {
                 opening_container,
                 closing_container,
@@ -74,7 +78,7 @@ pub enum Error {
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match &*self {
+        match self {
             Error::ParsingError(ref error_value) => {
                 f.write_str(format!("\x1b[1;31mParse Error\x1b[0m:\n{}", error_value).as_str())
             }

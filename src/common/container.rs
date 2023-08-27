@@ -111,7 +111,6 @@ macro_rules! define_type_checks {
 
 impl Eq for Container {}
 
-// == operator declaration
 impl PartialEq for Container {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -139,7 +138,6 @@ impl PartialEq for Container {
     }
 }
 
-// Display Object
 impl fmt::Display for Container {
     #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -147,29 +145,30 @@ impl fmt::Display for Container {
     }
 }
 
-// To do: Implement index
+/// To do: Implement index
 impl Container {
-    // Returned New Object
+    /// Returned New Object
     #[inline(always)]
     pub fn new_object() -> Self {
         Self::Object(HashMap::new())
     }
 
-    // Returns New Array Object
+    /// Returns New Array Object
     #[inline(always)]
     pub fn new_array() -> Self {
         Self::Array(Vec::new())
     }
 
-    // Returns new set
+    /// Returns new set
     #[inline(always)]
     pub fn new_set() -> Self {
         Self::Set(HashSet::new())
     }
 
-    // Array: Push an item into array or an element into set:
-    // Returns false if not inserted
-    // Permissible for array type only
+    /// Array: Push an item into array or an element into set:
+    ///
+    /// Returns `false` if element cannot be added in container
+    /// Permissible for array type only
     pub fn push(&mut self, val: Self) -> bool {
         match self {
             // Array push
@@ -185,11 +184,12 @@ impl Container {
         }
     }
 
-    // Insert/Replaces key value pair into Object
-    // Returns true if success, else false.
+    /// Insert/Replaces key value pair into Object
+    ///
+    /// Returns `true` if success, else `false`.
     pub fn insert(&mut self, key: String, val: Self) -> bool {
         match self {
-            Self::Object(map) => map.insert(key.to_owned(), val) != None,
+            Self::Object(map) => map.insert(key, val).is_some(),
             _ => {
                 println!("Error: The storage should be of type Object");
                 false
@@ -197,11 +197,12 @@ impl Container {
         }
     }
 
-    // Insert/Replaces key value pair into Object
-    // Returns true if success, else false.
+    /// Insert/Replaces key value pair into Object, where a key is `&str` literal
+    ///
+    /// Returns `true` if success, else `false`.
     pub fn insert_str(&mut self, key: &str, val: Self) -> bool {
         match self {
-            Self::Object(map) => map.insert(key.to_owned(), val) != None,
+            Self::Object(map) => map.insert(key.to_owned(), val).is_some(),
             _ => {
                 println!("Error: The storage should be of type Object");
                 false
@@ -209,7 +210,7 @@ impl Container {
         }
     }
 
-    // Print the Stored value
+    /// Dump value to a string.
     pub fn dump_object(&self, indent: bool, indent_size: u8, white_space: &str) -> String {
         match self {
             Self::Array(value) => {
@@ -219,57 +220,69 @@ impl Container {
                         value
                             .iter()
                             .map(|element| element.dump_object(indent, indent_size, white_space))
-                            .enumerate().fold(String::from(""), |prev, (idx, curr)| {
+                            .enumerate()
+                            .fold(String::from(""), |prev, (idx, curr)| {
                                 prev + if idx == 0 { "" } else { "," } + &curr
                             })
                     )
+                } else if value.len() == 0 {
+                    "[]".to_owned()
                 } else {
-                    if value.len() == 0 {
-                        "[]".to_owned()
-                    } else {
-                        let space = white_space.to_owned() + 
-                            (0..indent_size).map(|_| ' ').collect::<String>().as_str();
-                        format!(
-                            "[\n{}\n{}]",
-                            value
-                                .iter()
-                                .map(|element| format!(
-                                    "{}{}", space, element.dump_object(indent, indent_size, &space)
-                                )).enumerate().fold(String::from(""), |prev, (idx, curr)| {
-                                    prev + if idx == 0 { "" } else { ",\n" } + &curr
-                                }),
-                            white_space
-                        )
-                    }
+                    let space = white_space.to_owned()
+                        + (0..indent_size).map(|_| ' ').collect::<String>().as_str();
+                    format!(
+                        "[\n{}\n{}]",
+                        value
+                            .iter()
+                            .map(|element| format!(
+                                "{}{}",
+                                space,
+                                element.dump_object(indent, indent_size, &space)
+                            ))
+                            .enumerate()
+                            .fold(String::from(""), |prev, (idx, curr)| {
+                                prev + if idx == 0 { "" } else { ",\n" } + &curr
+                            }),
+                        white_space
+                    )
                 }
             }
             Self::Object(map) => {
                 if !indent {
                     format!(
                         "{{{}}}",
-                        map.iter().map(|(key, val)| format!(
-                            "{:?}:{}", key, val.dump_object(indent, indent_size, white_space)
-                        )).enumerate().fold(String::from(""), |prev, (idx, curr)| {
-                            prev + if idx == 0 { "" } else { "," } + &curr
-                        })
+                        map.iter()
+                            .map(|(key, val)| format!(
+                                "{:?}:{}",
+                                key,
+                                val.dump_object(indent, indent_size, white_space)
+                            ))
+                            .enumerate()
+                            .fold(String::from(""), |prev, (idx, curr)| {
+                                prev + if idx == 0 { "" } else { "," } + &curr
+                            })
                     )
+                } else if map.is_empty() {
+                    "{}".to_owned()
                 } else {
-                    if map.len() == 0 {
-                        "{}".to_owned()
-                    } else {
-                        let space = white_space.to_owned() + 
-                            (0..indent_size).map(|_| ' ').collect::<String>().as_str();
-                        // space += c;
-                        format!(
-                            "{{{}\n{}}}",
-                            map.iter().map(|(key, val)| format!(
-                                "{}{:?}: {}", space, key, val.dump_object(indent, indent_size, &space)
-                            )).enumerate().fold(String::from(""), |prev, (idx, curr)| {
+                    let space = white_space.to_owned()
+                        + (0..indent_size).map(|_| ' ').collect::<String>().as_str();
+                    // space += c;
+                    format!(
+                        "{{{}\n{}}}",
+                        map.iter()
+                            .map(|(key, val)| format!(
+                                "{}{:?}: {}",
+                                space,
+                                key,
+                                val.dump_object(indent, indent_size, &space)
+                            ))
+                            .enumerate()
+                            .fold(String::from(""), |prev, (idx, curr)| {
                                 prev + if idx == 0 { "\n" } else { ",\n" } + &curr
                             }),
-                            white_space
-                        )
-                    }
+                        white_space
+                    )
                 }
             }
             Self::Set(value) => {
@@ -279,28 +292,31 @@ impl Container {
                         value
                             .iter()
                             .map(|element| element.dump_object(indent, indent_size, white_space))
-                            .enumerate().fold(String::from(""), |prev, (idx, curr)| {
+                            .enumerate()
+                            .fold(String::from(""), |prev, (idx, curr)| {
                                 prev + if idx == 0 { "" } else { "," } + &curr
                             })
                     )
+                } else if value.len() == 0 {
+                    "()".to_owned()
                 } else {
-                    if value.len() == 0 {
-                        "()".to_owned()
-                    } else {
-                        let space = white_space.to_owned() + 
-                            (0..indent_size).map(|_| ' ').collect::<String>().as_str();
-                        format!(
-                            "(\n{}\n{})",
-                            value
-                                .iter()
-                                .map(|element| format!(
-                                    "{}{}", space, element.dump_object(indent, indent_size, &space)
-                                )).enumerate().fold(String::from(""), |prev, (idx, curr)| {
-                                    prev + if idx == 0 { "" } else { ",\n" } + &curr
-                                }),
-                            white_space
-                        )
-                    }
+                    let space = white_space.to_owned()
+                        + (0..indent_size).map(|_| ' ').collect::<String>().as_str();
+                    format!(
+                        "(\n{}\n{})",
+                        value
+                            .iter()
+                            .map(|element| format!(
+                                "{}{}",
+                                space,
+                                element.dump_object(indent, indent_size, &space)
+                            ))
+                            .enumerate()
+                            .fold(String::from(""), |prev, (idx, curr)| {
+                                prev + if idx == 0 { "" } else { ",\n" } + &curr
+                            }),
+                        white_space
+                    )
                 }
             }
             Self::Number(value) => value.to_string(),
@@ -368,8 +384,8 @@ impl Container {
 
     define_type_checks!(Set, is_set);
 
-    pub fn is_null(self) -> bool {
-        self == Self::Null
+    pub fn is_null(&self) -> bool {
+        *self == Self::Null
     }
 
     /// Returns the length of an object
@@ -386,12 +402,11 @@ impl Container {
 
 impl Index<usize> for Container {
     type Output = Self;
-    // Returns the value given the index (usize).
     fn index(&self, idx: usize) -> &Self::Output {
         match self {
             Self::Array(value) => {
                 if value.len() > idx {
-                    &value.get(idx).unwrap()
+                    value.get(idx).unwrap()
                 } else {
                     &Self::Null
                 }
@@ -403,7 +418,6 @@ impl Index<usize> for Container {
 
 impl Index<String> for Container {
     type Output = Self;
-    // Returns the value given the string index
     fn index(&self, idx: String) -> &Self::Output {
         match self {
             Self::Object(value) => {
@@ -420,7 +434,6 @@ impl Index<String> for Container {
 
 impl Index<&str> for Container {
     type Output = Self;
-    // Returns the value given the string index
     fn index(&self, idx: &str) -> &Self::Output {
         match self {
             Self::Object(value) => {
@@ -458,7 +471,6 @@ impl IndexMut<usize> for Container {
 }
 
 impl IndexMut<String> for Container {
-    // Returns the value given the index (usize).
     fn index_mut(&mut self, idx: String) -> &mut Self {
         match self {
             Self::Object(value) => {
@@ -478,8 +490,7 @@ impl IndexMut<String> for Container {
 }
 
 impl IndexMut<&str> for Container {
-    // Returns the value given the index (usize).
-    fn index_mut<'a>(&mut self, idx: &'a str) -> &mut Self {
+    fn index_mut(&mut self, idx: &str) -> &mut Self {
         match self {
             Self::Object(value) => {
                 let key = idx.to_owned();
