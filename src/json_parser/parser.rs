@@ -45,8 +45,8 @@ macro_rules! expect_next_bytes {
             if let Some(d) = read_byte!($parser) {
                 if d != $next_char {
                     return Err(Error::ParsingError(ParseError::UnexpectedTokenError(
-                        d as char, 
-                        $parser.curr_line, 
+                        d as char,
+                        $parser.curr_line,
                         $parser.curr_column
                     )));
                 }

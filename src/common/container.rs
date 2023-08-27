@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
-use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::{Index, IndexMut};
 use std::option::Option::Some;
+use std::fmt;
 
 /// A Container that has ability to store different kind
 /// of data at a time. This includes basic data types like
@@ -211,112 +211,93 @@ impl Container {
     }
 
     /// Dump value to a string.
-    pub fn dump_object(&self, indent: bool, indent_size: u8, white_space: &str) -> String {
+    pub fn dump_object(&self, indent: bool, indent_size: u8, wspace: &str) -> String {
         match self {
             Self::Array(value) => {
-                if !indent {
-                    format!(
-                        "[{}]",
-                        value
-                            .iter()
-                            .map(|element| element.dump_object(indent, indent_size, white_space))
-                            .enumerate()
-                            .fold(String::from(""), |prev, (idx, curr)| {
-                                prev + if idx == 0 { "" } else { "," } + &curr
-                            })
-                    )
-                } else if value.len() == 0 {
+                if value.is_empty() {
                     "[]".to_owned()
-                } else {
-                    let space = white_space.to_owned()
-                        + (0..indent_size).map(|_| ' ').collect::<String>().as_str();
-                    format!(
-                        "[\n{}\n{}]",
-                        value
+                } else if !indent {
+                    "[".to_owned()
+                        + &value
                             .iter()
-                            .map(|element| format!(
-                                "{}{}",
-                                space,
-                                element.dump_object(indent, indent_size, &space)
-                            ))
-                            .enumerate()
-                            .fold(String::from(""), |prev, (idx, curr)| {
-                                prev + if idx == 0 { "" } else { ",\n" } + &curr
-                            }),
-                        white_space
-                    )
+                            .map(|e| e.dump_object(indent, indent_size, wspace))
+                            .collect::<Vec<String>>()
+                            .join(",")
+                        + "]"
+                } else {
+                    let space = wspace.to_owned()
+                        + (0..indent_size).map(|_| ' ').collect::<String>().as_str();
+                    "[\n".to_owned()
+                        + &value
+                            .iter()
+                            .map(|e| {
+                                space.to_owned()
+                                    + &e.dump_object(indent, indent_size, space.as_str())
+                            })
+                            .collect::<Vec<String>>()
+                            .join(",\n")
+                        + "\n"
+                        + wspace
+                        + "]"
                 }
             }
             Self::Object(map) => {
-                if !indent {
-                    format!(
-                        "{{{}}}",
-                        map.iter()
-                            .map(|(key, val)| format!(
-                                "{:?}:{}",
-                                key,
-                                val.dump_object(indent, indent_size, white_space)
-                            ))
-                            .enumerate()
-                            .fold(String::from(""), |prev, (idx, curr)| {
-                                prev + if idx == 0 { "" } else { "," } + &curr
-                            })
-                    )
-                } else if map.is_empty() {
+                if map.is_empty() {
                     "{}".to_owned()
+                } else if !indent {
+                    "{".to_owned()
+                        + &map
+                            .iter()
+                            .map(|(k, v)| {
+                                format!("{:?}", k) + &v.dump_object(indent, indent_size, "")
+                            })
+                            .collect::<Vec<String>>()
+                            .join(",")
+                        + "}"
                 } else {
-                    let space = white_space.to_owned()
+                    let space = wspace.to_owned()
                         + (0..indent_size).map(|_| ' ').collect::<String>().as_str();
-                    // space += c;
-                    format!(
-                        "{{{}\n{}}}",
-                        map.iter()
-                            .map(|(key, val)| format!(
-                                "{}{:?}: {}",
-                                space,
-                                key,
-                                val.dump_object(indent, indent_size, &space)
-                            ))
-                            .enumerate()
-                            .fold(String::from(""), |prev, (idx, curr)| {
-                                prev + if idx == 0 { "\n" } else { ",\n" } + &curr
-                            }),
-                        white_space
-                    )
+                    "{\n".to_owned()
+                        + &map
+                            .iter()
+                            .map(|(k, v)| {
+                                space.to_owned()
+                                    + &format!("{:?}: ", k)
+                                    + &v.dump_object(indent, indent_size, &space)
+                            })
+                            .collect::<Vec<String>>()
+                            .join(",\n")
+                        + "\n"
+                        + &wspace
+                        + "}"
                 }
             }
             Self::Set(value) => {
-                if !indent {
-                    format!(
-                        "({})",
-                        value
-                            .iter()
-                            .map(|element| element.dump_object(indent, indent_size, white_space))
-                            .enumerate()
-                            .fold(String::from(""), |prev, (idx, curr)| {
-                                prev + if idx == 0 { "" } else { "," } + &curr
-                            })
-                    )
-                } else if value.len() == 0 {
+                if value.is_empty() {
                     "()".to_owned()
-                } else {
-                    let space = white_space.to_owned()
-                        + (0..indent_size).map(|_| ' ').collect::<String>().as_str();
-                    format!(
-                        "(\n{}\n{})",
-                        value
+                } else if !indent {
+                    "(".to_owned()
+                        + &value
                             .iter()
-                            .map(|element| format!(
-                                "{}{}",
-                                space,
-                                element.dump_object(indent, indent_size, &space)
-                            ))
-                            .enumerate()
-                            .fold(String::from(""), |prev, (idx, curr)| {
-                                prev + if idx == 0 { "" } else { ",\n" } + &curr
-                            }),
-                        white_space
-                    )
+                            .map(|e| e.dump_object(indent, indent_size, wspace))
+                            .collect::<Vec<String>>()
+                            .join(",")
+                        + ")"
+                } else {
+                    let space = wspace.to_owned()
+                        + (0..indent_size).map(|_| ' ').collect::<String>().as_str();
+                    "(\n".to_owned()
+                        + &value
+                            .iter()
+                            .map(|e| {
+                                space.to_owned()
+                                    + &e.dump_object(indent, indent_size, space.as_str())
+                            })
+                            .collect::<Vec<String>>()
+                            .join(",\n")
+                        + "\n"
+                        + wspace
+                        + ")"
                 }
             }
             Self::Number(value) => value.to_string(),
@@ -449,7 +430,6 @@ impl Index<&str> for Container {
 }
 
 impl IndexMut<usize> for Container {
-    // Returns the value given the index (usize).
     fn index_mut(&mut self, index: usize) -> &mut Self {
         match self {
             Self::Array(value) => {
