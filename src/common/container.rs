@@ -1,8 +1,7 @@
 use std::collections::{HashMap, HashSet};
-use std::hash::{Hash, Hasher};
-use std::ops::{Index, IndexMut};
-use std::option::Option::Some;
-use std::fmt;
+use core::hash::{Hash, Hasher};
+use core::ops::{Index, IndexMut};
+use core::fmt;
 
 /// A Container that has ability to store different kind
 /// of data at a time. This includes basic data types like
@@ -120,7 +119,7 @@ impl PartialEq for Container {
             (Self::Boolean(this), Self::Boolean(other)) => this == other,
             (Self::Str(this), Self::Str(other)) => this == other,
             (Self::Array(arr), Self::Array(oarr)) => {
-                arr.len() == oarr.len() && arr.iter().zip(oarr.iter()).all(|(a, b)| a == b)
+                arr.len() == oarr.len() && arr.iter().zip(oarr).all(|(a, b)| a == b)
             }
             (Self::Set(set), Self::Set(other_set)) => {
                 (set.len() == other_set.len())
@@ -178,24 +177,24 @@ impl Container {
             }
             Self::Set(ref mut value) => value.insert(val),
             _ => {
-                println!("Error: The storage type should be of array or a set for pushing values.");
+                // debug_assert!(1 == 2, "Error: The storage type should be of array or a set for pushing values.");
                 false
             }
         }
     }
 
-    /// Insert/Replaces key value pair into Object
-    ///
-    /// Returns `true` if success, else `false`.
-    pub fn insert(&mut self, key: String, val: Self) -> bool {
-        match self {
-            Self::Object(map) => map.insert(key, val).is_some(),
-            _ => {
-                println!("Error: The storage should be of type Object");
-                false
-            }
-        }
-    }
+    // /// Insert/Replaces key value pair into Object
+    // ///
+    // /// Returns `true` if success, else `false`.
+    // pub fn insert(&mut self, key: String, val: Self) -> bool {
+    //     match self {
+    //         Self::Object(map) => map.insert(key, val).is_some(),
+    //         _ => {
+    //             println!("Error: The storage should be of type Object");
+    //             false
+    //         }
+    //     }
+    // }
 
     /// Insert/Replaces key value pair into Object, where a key is `&str` literal
     ///
@@ -203,10 +202,7 @@ impl Container {
     pub fn insert_str(&mut self, key: &str, val: Self) -> bool {
         match self {
             Self::Object(map) => map.insert(key.to_owned(), val).is_some(),
-            _ => {
-                println!("Error: The storage should be of type Object");
-                false
-            }
+            _ => false
         }
     }
 
@@ -462,7 +458,7 @@ impl IndexMut<String> for Container {
             _ => {
                 // Log: Change into array warning
                 *self = Self::new_object();
-                self.insert(idx.to_owned(), Self::Null);
+                self.insert_str(idx.as_str(), Self::Null);
                 &mut self[idx]
             }
         }
@@ -481,7 +477,7 @@ impl IndexMut<&str> for Container {
             }
             _ => {
                 *self = Self::new_object();
-                self.insert(idx.to_owned(), Self::Null);
+                self.insert_str(idx, Self::Null);
                 &mut self[idx]
             }
         }

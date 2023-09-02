@@ -1,9 +1,7 @@
-use std::fs;
-
 use crate::common::container::Container;
 use crate::common::error::Error;
 use crate::common::error::ParseError;
-use std::result::Result;
+use core::result::Result;
 
 /// Single-threaded parsing module, with an intent to parse the
 /// files faster with handling run-time errors (hopefully), considering two modes
@@ -156,16 +154,16 @@ impl Parser {
     ///
     fn read_string_in_quotes(&mut self, end_quote_expected: u8) -> Result<Container, Error> {
         // Current byte is a quote, read and move to next one
-        // let mut str_result_container: String = String::from("");
         let mut start: usize = self.offset;
         let mut final_string = "".to_owned();
+
         loop {
             match read_byte!(self) {
                 // Handle this by storing current slice and create a new slice again.
                 Some(b'\\') => {
                     unsafe {
-                        final_string.push_str(std::str::from_utf8_unchecked(
-                            std::slice::from_raw_parts(
+                        final_string.push_str(core::str::from_utf8_unchecked(
+                            core::slice::from_raw_parts(
                                 self.container.add(start),
                                 self.offset - start - 1,
                             ),
@@ -188,8 +186,8 @@ impl Parser {
                 Some(b'\'' | b'"') => {
                     if self.curr_byte == end_quote_expected {
                         unsafe {
-                            final_string.push_str(std::str::from_utf8_unchecked(
-                                std::slice::from_raw_parts(
+                            final_string.push_str(core::str::from_utf8_unchecked(
+                                core::slice::from_raw_parts(
                                     self.container.add(start),
                                     self.offset - start - 1,
                                 ),
@@ -310,6 +308,7 @@ impl Parser {
             // Skip colon
             read_byte!(self);
             skip_whitespaces!(self);
+
             let assoc_value = match self.curr_byte {
                 b'\'' | b'\"' => self.read_string_in_quotes(self.curr_byte),
                 b'{' => self.read_objects(),
@@ -348,8 +347,8 @@ impl Parser {
                     self.curr_line,
                     self.curr_column,
                 ))),
-            };
-            object_container.insert(verification.as_string().unwrap(), assoc_value?);
+            }?;
+            object_container.insert_str(verification.as_string().unwrap().as_str(), assoc_value);
 
             if !self.num_read {
                 read_byte!(self);
@@ -433,7 +432,7 @@ impl Parser {
             prev_byte = self.curr_byte;
         }
         let str_slice = unsafe {
-            std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+            core::str::from_utf8_unchecked(core::slice::from_raw_parts(
                 self.container.add(start),
                 self.offset - start - 1 + if abrupt_end { 1 } else { 0 },
             ))
@@ -446,13 +445,6 @@ impl Parser {
             Ok(Container::Unsigned(str_slice.parse::<u64>().unwrap()))
         }
     }
-}
-
-/// Read the files in byte form
-/// For testing purpose: as it might be fastest
-#[inline(always)]
-pub fn read_file_as_bytes(filename: &str) -> Result<Container, Error> {
-    parse_str(&fs::read_to_string(filename).expect("Error: cannot open file"))
 }
 
 /// Read the files in byte form

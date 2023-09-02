@@ -19,7 +19,7 @@ pub enum ParseError {
     InvalidNumberParseError(char),
 }
 
-impl std::fmt::Display for ParseError {
+impl core::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             ParseError::UnexpectedTokenError(chr, line, col) => f.write_str(
@@ -76,7 +76,7 @@ pub enum Error {
     ArgError(String),
 }
 
-impl std::fmt::Display for Error {
+impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Error::ParsingError(ref error_value) => {
