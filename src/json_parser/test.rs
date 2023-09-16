@@ -1,9 +1,9 @@
-use core::result::Result;
 
-use crate::common::error::Error;
-use crate::json_parser::parser::parse_str;
 mod tests {
-    use super::*;
+    use core::result::Result;
+    use crate::common::error::Error;
+    use crate::json_parser::parser::parse_str;
+
     #[test]
     fn test_object() -> Result<(), Error> {
         let a = parse_str(

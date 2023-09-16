@@ -79,9 +79,10 @@ pub enum Error {
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Error::ParsingError(ref error_value) => {
-                f.write_str(format!("\x1b[1;31mParse Error\x1b[0m:\n{}", error_value).as_str())
-            }
+            Error::ParsingError(ref error_value) => f.write_str(
+                format!("\x1b[1;31mParse Error\x1b[0m:\n{}", error_value)
+                    .as_str(),
+            ),
             Error::CommandNotFoundError(ref value) => f.write_str(
                 format!(
                     "\x1b[1;31mError\x1b[0m: no command named '{}' exists",

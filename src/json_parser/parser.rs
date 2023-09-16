@@ -40,10 +40,11 @@ macro_rules! read_byte {
 macro_rules! expect_next_bytes {
     ($parser:ident, $( $next_char:expr ),*) => ({
         $(
-            if let Some(d) = read_byte!($parser) {
-                if d != $next_char {
+            match read_byte!($parser) {
+                Some($next_char) => { }
+                val @ _ => {
                     return Err(Error::ParsingError(ParseError::UnexpectedTokenError(
-                        d as char,
+                        if val.is_some() { val.unwrap() } else { b'\0' } as char,
                         $parser.curr_line,
                         $parser.curr_column
                     )));
@@ -75,10 +76,9 @@ macro_rules! assert_curr_byte {
 
 macro_rules! equals_in {
     ($compare: expr, $( $char: expr ),*) => {
-        if let Some($ ( $char )|* ) = Some($compare) {
-            true
-        } else {
-            false
+        match $compare {
+            $ ( $char )|* => true,
+            _ => false
         }
     };
 }
@@ -139,7 +139,9 @@ impl Parser {
         skip_whitespaces!(self);
         match self.curr_byte {
             b'\'' | b'"' => self.read_string_in_quotes(self.curr_byte),
-            b'[' | b'(' => self.read_array_or_set(get_closing_container!(self.curr_byte)),
+            b'[' | b'(' => {
+                self.read_array_or_set(get_closing_container!(self.curr_byte))
+            }
             b'{' => self.read_objects(),
             b'0'..=b'9' | b'+' | b'-' => self.read_number(self.curr_byte),
             _ => Err(Error::ParsingError(ParseError::UnexpectedTokenError(
@@ -152,7 +154,10 @@ impl Parser {
 
     /// Read string values that are stored
     ///
-    fn read_string_in_quotes(&mut self, end_quote_expected: u8) -> Result<Container, Error> {
+    fn read_string_in_quotes(
+        &mut self,
+        end_quote_expected: u8,
+    ) -> Result<Container, Error> {
         // Current byte is a quote, read and move to next one
         let mut start: usize = self.offset;
         let mut final_string = "".to_owned();
@@ -186,12 +191,14 @@ impl Parser {
                 Some(b'\'' | b'"') => {
                     if self.curr_byte == end_quote_expected {
                         unsafe {
-                            final_string.push_str(core::str::from_utf8_unchecked(
-                                core::slice::from_raw_parts(
-                                    self.container.add(start),
-                                    self.offset - start - 1,
+                            final_string.push_str(
+                                core::str::from_utf8_unchecked(
+                                    core::slice::from_raw_parts(
+                                        self.container.add(start),
+                                        self.offset - start - 1,
+                                    ),
                                 ),
-                            ));
+                            );
                         }
                         break;
                     }
@@ -199,11 +206,14 @@ impl Parser {
                 _ => {}
             }
         }
-        Ok(Container::Str(final_string))
+        Ok(Container::String(final_string))
     }
 
     /// Parse values to store in an array
-    fn read_array_or_set(&mut self, end_bracket_expected: u8) -> Result<Container, Error> {
+    fn read_array_or_set(
+        &mut self,
+        end_bracket_expected: u8,
+    ) -> Result<Container, Error> {
         // Current byte is a quote, read and move to next one
         let mut array_container: Container = if end_bracket_expected == b']' {
             Container::new_array()
@@ -216,7 +226,8 @@ impl Parser {
             skip_whitespaces!(self);
             let curr_container = match self.curr_byte {
                 b'\'' | b'"' => self.read_string_in_quotes(self.curr_byte),
-                b'[' | b'(' => self.read_array_or_set(get_closing_container!(self.curr_byte)),
+                b'[' | b'(' => self
+                    .read_array_or_set(get_closing_container!(self.curr_byte)),
                 b'{' => self.read_objects(),
                 b't' => {
                     expect_next_bytes!(self, b'r', b'u', b'e');
@@ -242,12 +253,16 @@ impl Parser {
                         ))
                     }
                 }
-                b'0'..=b'9' | b'.' | b'-' | b'+' => self.read_number(self.curr_byte),
-                _ => Err(Error::ParsingError(ParseError::UnexpectedTokenError(
-                    self.curr_byte as char,
-                    self.curr_line,
-                    self.curr_column,
-                ))),
+                b'0'..=b'9' | b'.' | b'-' | b'+' => {
+                    self.read_number(self.curr_byte)
+                }
+                _ => {
+                    Err(Error::ParsingError(ParseError::UnexpectedTokenError(
+                        self.curr_byte as char,
+                        self.curr_line,
+                        self.curr_column,
+                    )))
+                }
             }?;
             array_container.push(curr_container);
 
@@ -273,11 +288,13 @@ impl Parser {
                     }
                 } // End of current array/set
                 _ => {
-                    return Err(Error::ParsingError(ParseError::UnexpectedTokenError(
-                        self.curr_byte as char,
-                        self.curr_line,
-                        self.curr_column,
-                    )));
+                    return Err(Error::ParsingError(
+                        ParseError::UnexpectedTokenError(
+                            self.curr_byte as char,
+                            self.curr_line,
+                            self.curr_column,
+                        ),
+                    ));
                 }
             }
         }
@@ -294,11 +311,13 @@ impl Parser {
             let verification = match self.curr_byte {
                 b'\'' | b'\"' => self.read_string_in_quotes(self.curr_byte),
                 b'}' => break,
-                _ => Err(Error::ParsingError(ParseError::UnexpectedTokenError(
-                    self.curr_byte as char,
-                    self.curr_line,
-                    self.curr_column,
-                ))),
+                _ => {
+                    Err(Error::ParsingError(ParseError::UnexpectedTokenError(
+                        self.curr_byte as char,
+                        self.curr_line,
+                        self.curr_column,
+                    )))
+                }
             }?;
 
             // Skip inverted commas or brackets
@@ -312,7 +331,8 @@ impl Parser {
             let assoc_value = match self.curr_byte {
                 b'\'' | b'\"' => self.read_string_in_quotes(self.curr_byte),
                 b'{' => self.read_objects(),
-                b'[' | b'(' => self.read_array_or_set(get_closing_container!(self.curr_byte)),
+                b'[' | b'(' => self
+                    .read_array_or_set(get_closing_container!(self.curr_byte)),
                 b']' | b')' | b'}' => {
                     if self.curr_byte == b'}' {
                         Err(Error::ParsingError(
@@ -341,14 +361,21 @@ impl Parser {
                     expect_next_bytes!(self, b'u', b'l', b'l');
                     Ok(Container::Null)
                 }
-                b'0'..=b'9' | b'.' | b'-' | b'+' => self.read_number(self.curr_byte),
-                _ => Err(Error::ParsingError(ParseError::UnexpectedTokenError(
-                    self.curr_byte as char,
-                    self.curr_line,
-                    self.curr_column,
-                ))),
+                b'0'..=b'9' | b'.' | b'-' | b'+' => {
+                    self.read_number(self.curr_byte)
+                }
+                _ => {
+                    Err(Error::ParsingError(ParseError::UnexpectedTokenError(
+                        self.curr_byte as char,
+                        self.curr_line,
+                        self.curr_column,
+                    )))
+                }
             }?;
-            object_container.insert_str(verification.as_string().unwrap().as_str(), assoc_value);
+            object_container.insert_str(
+                verification.as_string().unwrap().as_str(),
+                assoc_value,
+            );
 
             if !self.num_read {
                 read_byte!(self);
@@ -370,11 +397,13 @@ impl Parser {
                     ));
                 }
                 _ => {
-                    return Err(Error::ParsingError(ParseError::UnexpectedTokenError(
-                        self.curr_byte as char,
-                        self.curr_line,
-                        self.curr_column,
-                    )));
+                    return Err(Error::ParsingError(
+                        ParseError::UnexpectedTokenError(
+                            self.curr_byte as char,
+                            self.curr_line,
+                            self.curr_column,
+                        ),
+                    ));
                 }
             }
         }
@@ -384,6 +413,7 @@ impl Parser {
 
     /// Read a number from given input
     /// Returns Error if an unexpected token occurs.
+    #[allow(unused_variables)]
     fn read_number(&mut self, byte_read: u8) -> Result<Container, Error> {
         let (mut read_dot, sign_read, mut prev_byte) = (
             byte_read == b'.',
@@ -391,26 +421,32 @@ impl Parser {
             byte_read,
         );
         let abrupt_end;
-        let (mut read_exp, mut sign_exp, start) = (false, false, self.offset - 1);
+        let (mut read_exp, mut sign_exp, start) =
+            (false, false, self.offset - 1);
 
         loop {
             match read_byte!(self) {
                 Some(b'0'..=b'9' | b'.' | b'e' | b'E' | b'+' | b'-') => {
                     if (read_dot && self.curr_byte == b'.')
-                        || (read_exp && (equals_in!(self.curr_byte, b'.', b'e', b'E')))
+                        || (read_exp
+                            && (equals_in!(self.curr_byte, b'.', b'e', b'E')))
                     {
-                        return Err(Error::ParsingError(ParseError::InvalidNumberParseError(
-                            self.curr_byte as char,
-                        )));
+                        return Err(Error::ParsingError(
+                            ParseError::InvalidNumberParseError(
+                                self.curr_byte as char,
+                            ),
+                        ));
                     }
 
                     if read_exp
                         && !equals_in!(prev_byte, b'e', b'E')
                         && equals_in!(self.curr_byte, b'+', b'-')
                     {
-                        return Err(Error::ParsingError(ParseError::InvalidNumberParseError(
-                            self.curr_byte as char,
-                        )));
+                        return Err(Error::ParsingError(
+                            ParseError::InvalidNumberParseError(
+                                self.curr_byte as char,
+                            ),
+                        ));
                     }
 
                     read_exp |= equals_in!(self.curr_byte, b'e', b'E');
@@ -419,14 +455,17 @@ impl Parser {
                         && equals_in!(self.curr_byte, b'-', b'+');
                     read_dot |= read_exp || self.curr_byte == b'.';
                 }
-                val @ Some(b' ' | 9..=13 | b',' | b']' | b'}' | b')') | val @ None => {
+                val @ Some(b' ' | 9..=13 | b',' | b']' | b'}' | b')')
+                | val @ None => {
                     (self.num_read, abrupt_end) = (true, val.is_none());
                     break;
                 }
                 _ => {
-                    return Err(Error::ParsingError(ParseError::InvalidNumberParseError(
-                        self.curr_byte as char,
-                    )));
+                    return Err(Error::ParsingError(
+                        ParseError::InvalidNumberParseError(
+                            self.curr_byte as char,
+                        ),
+                    ));
                 }
             }
             prev_byte = self.curr_byte;
@@ -437,6 +476,7 @@ impl Parser {
                 self.offset - start - 1 + if abrupt_end { 1 } else { 0 },
             ))
         };
+
         if read_dot || read_exp {
             Ok(Container::Decimal(str_slice.parse::<f64>().unwrap()))
         } else if sign_read == b'-' {
@@ -450,6 +490,7 @@ impl Parser {
 /// Read the files in byte form
 /// For testing purpose: as it might be fastest
 #[inline(always)]
+#[allow(unused)]
 pub fn read_str(input_str: &str) -> Result<Container, Error> {
     parse_str(input_str)
 }

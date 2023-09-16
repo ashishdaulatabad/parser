@@ -1,7 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use core::fmt;
 use core::hash::{Hash, Hasher};
 use core::ops::{Index, IndexMut};
-use core::fmt;
+use std::collections::{HashMap, HashSet};
 
 /// A Container that has ability to store different kind
 /// of data at a time. This includes basic data types like
@@ -15,7 +15,7 @@ use core::fmt;
 /// ## Examples for basic types
 /// ```
 /// let storage: Container = Container::Decimal(2e9+76);
-/// let mut str: Container = Container::Str("here".to_string());
+/// let mut str: Container = Container::String("here".to_string());
 /// println!("{}, and {}", str);          // prints "here" and 2000000076
 /// ```
 ///
@@ -31,7 +31,7 @@ use core::fmt;
 /// array_container.push(Container::Decimal(2.34));
 ///
 /// let object_container: Container = Container::new_object();
-/// object_container.insert("key1".to_string(), Container::Str("hello".to_string()));
+/// object_container.insert("key1".to_string(), Container::String("hello".to_string()));
 ///
 /// array_container.push(object_container);
 /// println!("{}", array_container); /// dumps [true,4294967296,2.34,{"key1":"hello"}] in pretty fashion
@@ -52,7 +52,7 @@ pub enum Container {
     /// boolean value
     Boolean(bool),
     /// String
-    Str(String),
+    String(String),
     /// Dynamic allocated that can store
     /// these containers in consecutive fashion
     /// of their insertion.
@@ -76,7 +76,7 @@ impl Clone for Container {
             Self::Unsigned(element) => Self::Unsigned(*element),
             Self::Decimal(element) => Self::Decimal(*element),
             Self::Boolean(element) => Self::Boolean(*element),
-            Self::Str(ref element) => Self::Str(element.to_owned()),
+            Self::String(ref element) => Self::String(element.to_owned()),
             Self::Array(ref array) => Self::Array(array.clone()),
             Self::Object(ref object) => Self::Object(object.clone()),
             Self::Set(ref set) => Self::Set(set.clone()),
@@ -91,7 +91,7 @@ impl Hash for Container {
             Self::Number(v) => v.hash(s),
             Self::Unsigned(v) => v.hash(s),
             Self::Boolean(v) => v.hash(s),
-            Self::Str(ref v) => v.hash(s),
+            Self::String(ref v) => v.hash(s),
             _ => (),
         }
     }
@@ -117,19 +117,22 @@ impl PartialEq for Container {
             (Self::Unsigned(this), Self::Unsigned(other)) => this == other,
             (Self::Decimal(this), Self::Decimal(other)) => this == other,
             (Self::Boolean(this), Self::Boolean(other)) => this == other,
-            (Self::Str(this), Self::Str(other)) => this == other,
+            (Self::String(this), Self::String(other)) => this == other,
             (Self::Array(arr), Self::Array(oarr)) => {
-                arr.len() == oarr.len() && arr.iter().zip(oarr).all(|(a, b)| a == b)
+                arr.len() == oarr.len()
+                    && arr.iter().zip(oarr).all(|(a, b)| a == b)
             }
             (Self::Set(set), Self::Set(other_set)) => {
                 (set.len() == other_set.len())
-                    && set.iter().all(|value| other_set.get(value) == Some(value))
+                    && set
+                        .iter()
+                        .all(|value| other_set.get(value) == Some(value))
             }
             (Self::Object(map_object), Self::Object(other_map_object)) => {
                 (map_object.len() == other_map_object.len())
-                    && map_object
-                        .iter()
-                        .all(|(key, value)| other_map_object.get(key) == Some(value))
+                    && map_object.iter().all(|(key, value)| {
+                        other_map_object.get(key) == Some(value)
+                    })
             }
             (Self::Null, Self::Null) => true,
             _ => false,
@@ -144,6 +147,7 @@ impl fmt::Display for Container {
     }
 }
 
+#[allow(unused)]
 /// To do: Implement index
 impl Container {
     /// Returned New Object
@@ -176,25 +180,9 @@ impl Container {
                 true
             }
             Self::Set(ref mut value) => value.insert(val),
-            _ => {
-                // debug_assert!(1 == 2, "Error: The storage type should be of array or a set for pushing values.");
-                false
-            }
+            _ => false
         }
     }
-
-    // /// Insert/Replaces key value pair into Object
-    // ///
-    // /// Returns `true` if success, else `false`.
-    // pub fn insert(&mut self, key: String, val: Self) -> bool {
-    //     match self {
-    //         Self::Object(map) => map.insert(key, val).is_some(),
-    //         _ => {
-    //             println!("Error: The storage should be of type Object");
-    //             false
-    //         }
-    //     }
-    // }
 
     /// Insert/Replaces key value pair into Object, where a key is `&str` literal
     ///
@@ -202,12 +190,17 @@ impl Container {
     pub fn insert_str(&mut self, key: &str, val: Self) -> bool {
         match self {
             Self::Object(map) => map.insert(key.to_owned(), val).is_some(),
-            _ => false
+            _ => false,
         }
     }
 
     /// Dump value to a string.
-    pub fn dump_object(&self, indent: bool, indent_size: u8, wspace: &str) -> String {
+    pub fn dump_object(
+        &self,
+        indent: bool,
+        indent_size: u8,
+        wspace: &str,
+    ) -> String {
         match self {
             Self::Array(value) => {
                 if value.is_empty() {
@@ -222,13 +215,20 @@ impl Container {
                         + "]"
                 } else {
                     let space = wspace.to_owned()
-                        + (0..indent_size).map(|_| ' ').collect::<String>().as_str();
+                        + (0..indent_size)
+                            .map(|_| ' ')
+                            .collect::<String>()
+                            .as_str();
                     "[\n".to_owned()
                         + &value
                             .iter()
                             .map(|e| {
                                 space.to_owned()
-                                    + &e.dump_object(indent, indent_size, space.as_str())
+                                    + &e.dump_object(
+                                        indent,
+                                        indent_size,
+                                        space.as_str(),
+                                    )
                             })
                             .collect::<Vec<String>>()
                             .join(",\n")
@@ -245,21 +245,29 @@ impl Container {
                         + &map
                             .iter()
                             .map(|(k, v)| {
-                                format!("{:?}", k) + &v.dump_object(indent, indent_size, "")
+                                format!("{:?}", k)
+                                    + &v.dump_object(indent, indent_size, "")
                             })
                             .collect::<Vec<String>>()
                             .join(",")
                         + "}"
                 } else {
                     let space = wspace.to_owned()
-                        + (0..indent_size).map(|_| ' ').collect::<String>().as_str();
+                        + (0..indent_size)
+                            .map(|_| ' ')
+                            .collect::<String>()
+                            .as_str();
                     "{\n".to_owned()
                         + &map
                             .iter()
                             .map(|(k, v)| {
                                 space.to_owned()
                                     + &format!("{:?}: ", k)
-                                    + &v.dump_object(indent, indent_size, &space)
+                                    + &v.dump_object(
+                                        indent,
+                                        indent_size,
+                                        &space,
+                                    )
                             })
                             .collect::<Vec<String>>()
                             .join(",\n")
@@ -281,13 +289,20 @@ impl Container {
                         + ")"
                 } else {
                     let space = wspace.to_owned()
-                        + (0..indent_size).map(|_| ' ').collect::<String>().as_str();
+                        + (0..indent_size)
+                            .map(|_| ' ')
+                            .collect::<String>()
+                            .as_str();
                     "(\n".to_owned()
                         + &value
                             .iter()
                             .map(|e| {
                                 space.to_owned()
-                                    + &e.dump_object(indent, indent_size, space.as_str())
+                                    + &e.dump_object(
+                                        indent,
+                                        indent_size,
+                                        space.as_str(),
+                                    )
                             })
                             .collect::<Vec<String>>()
                             .join(",\n")
@@ -300,21 +315,21 @@ impl Container {
             Self::Unsigned(value) => value.to_string(),
             Self::Boolean(value) => value.to_string(),
             Self::Decimal(value) => value.to_string(),
-            Self::Str(ref value) => format!("{:?}", value),
+            Self::String(ref value) => format!("{:?}", value),
             Self::Null => "null".to_owned(),
         }
     }
 
     pub fn as_string(&self) -> Option<String> {
         match self {
-            Self::Str(value) => Some(value.to_owned()),
+            Self::String(value) => Some(value.to_owned()),
             _ => None,
         }
     }
 
     pub fn get_string(&self) -> Option<String> {
         match self {
-            Self::Str(value) => Some(value.to_owned()),
+            Self::String(value) => Some(value.to_owned()),
             _ => None,
         }
     }
@@ -355,7 +370,7 @@ impl Container {
 
     define_type_checks!(Boolean, is_bool);
 
-    define_type_checks!(Str, is_str);
+    define_type_checks!(String, is_str);
 
     define_type_checks!(Object, is_object);
 
@@ -371,7 +386,7 @@ impl Container {
             Self::Array(value) => value.len(),
             Self::Object(value) => value.len(),
             Self::Set(value) => value.len(),
-            Self::Str(value) => value.len(),
+            Self::String(value) => value.len(),
             _ => 1,
         }
     }
