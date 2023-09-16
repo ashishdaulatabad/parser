@@ -42,8 +42,8 @@ macro_rules! expect_next_bytes {
         $(
             match read_byte!($parser) {
                 Some($next_char) => { }
-                val @ _ => {
-                    return Err(Error::ParsingError(ParseError::UnexpectedTokenError(
+                val => {
+                    return Err(Error::Parsing(ParseError::UnexpectedToken(
                         if val.is_some() { val.unwrap() } else { b'\0' } as char,
                         $parser.curr_line,
                         $parser.curr_column
@@ -65,7 +65,7 @@ macro_rules! skip_whitespaces {
 macro_rules! assert_curr_byte {
     ($parser:ident, $byte_val:expr) => {
         if $parser.curr_byte != $byte_val {
-            return Err(Error::ParsingError(ParseError::UnexpectedTokenError(
+            return Err(Error::Parsing(ParseError::UnexpectedToken(
                 $parser.curr_byte as char,
                 $parser.curr_line,
                 $parser.curr_column,
@@ -144,7 +144,7 @@ impl Parser {
             }
             b'{' => self.read_objects(),
             b'0'..=b'9' | b'+' | b'-' => self.read_number(self.curr_byte),
-            _ => Err(Error::ParsingError(ParseError::UnexpectedTokenError(
+            _ => Err(Error::Parsing(ParseError::UnexpectedToken(
                 self.curr_byte as char,
                 self.curr_line,
                 self.curr_column,
@@ -245,8 +245,8 @@ impl Parser {
                     if self.curr_byte == end_bracket_expected {
                         break;
                     } else {
-                        Err(Error::ParsingError(
-                            ParseError::ContainerParanthesisMismatchError {
+                        Err(Error::Parsing(
+                            ParseError::ContainerParanthesisMismatch {
                                 opening_container: end_bracket_expected as char,
                                 closing_container: self.curr_byte as char,
                             },
@@ -257,7 +257,7 @@ impl Parser {
                     self.read_number(self.curr_byte)
                 }
                 _ => {
-                    Err(Error::ParsingError(ParseError::UnexpectedTokenError(
+                    Err(Error::Parsing(ParseError::UnexpectedToken(
                         self.curr_byte as char,
                         self.curr_line,
                         self.curr_column,
@@ -279,8 +279,8 @@ impl Parser {
                     if self.curr_byte == end_bracket_expected {
                         break;
                     } else {
-                        return Err(Error::ParsingError(
-                            ParseError::ContainerParanthesisMismatchError {
+                        return Err(Error::Parsing(
+                            ParseError::ContainerParanthesisMismatch {
                                 opening_container: end_bracket_expected as char,
                                 closing_container: self.curr_byte as char,
                             },
@@ -288,8 +288,8 @@ impl Parser {
                     }
                 } // End of current array/set
                 _ => {
-                    return Err(Error::ParsingError(
-                        ParseError::UnexpectedTokenError(
+                    return Err(Error::Parsing(
+                        ParseError::UnexpectedToken(
                             self.curr_byte as char,
                             self.curr_line,
                             self.curr_column,
@@ -312,7 +312,7 @@ impl Parser {
                 b'\'' | b'\"' => self.read_string_in_quotes(self.curr_byte),
                 b'}' => break,
                 _ => {
-                    Err(Error::ParsingError(ParseError::UnexpectedTokenError(
+                    Err(Error::Parsing(ParseError::UnexpectedToken(
                         self.curr_byte as char,
                         self.curr_line,
                         self.curr_column,
@@ -335,14 +335,14 @@ impl Parser {
                     .read_array_or_set(get_closing_container!(self.curr_byte)),
                 b']' | b')' | b'}' => {
                     if self.curr_byte == b'}' {
-                        Err(Error::ParsingError(
-                            ParseError::InvalidKeyValueFormatError {
+                        Err(Error::Parsing(
+                            ParseError::InvalidKeyValueFormat {
                                 reading_key: verification.as_string().unwrap(),
                             },
                         ))
                     } else {
-                        Err(Error::ParsingError(
-                            ParseError::ContainerParanthesisMismatchError {
+                        Err(Error::Parsing(
+                            ParseError::ContainerParanthesisMismatch {
                                 opening_container: '{',
                                 closing_container: self.curr_byte as char,
                             },
@@ -365,7 +365,7 @@ impl Parser {
                     self.read_number(self.curr_byte)
                 }
                 _ => {
-                    Err(Error::ParsingError(ParseError::UnexpectedTokenError(
+                    Err(Error::Parsing(ParseError::UnexpectedToken(
                         self.curr_byte as char,
                         self.curr_line,
                         self.curr_column,
@@ -389,16 +389,16 @@ impl Parser {
                 b',' => continue 'parsing_objects,
                 b'}' => break,
                 b']' | b')' => {
-                    return Err(Error::ParsingError(
-                        ParseError::ContainerParanthesisMismatchError {
+                    return Err(Error::Parsing(
+                        ParseError::ContainerParanthesisMismatch {
                             opening_container: '{',
                             closing_container: self.curr_byte as char,
                         },
                     ));
                 }
                 _ => {
-                    return Err(Error::ParsingError(
-                        ParseError::UnexpectedTokenError(
+                    return Err(Error::Parsing(
+                        ParseError::UnexpectedToken(
                             self.curr_byte as char,
                             self.curr_line,
                             self.curr_column,
@@ -431,8 +431,8 @@ impl Parser {
                         || (read_exp
                             && (equals_in!(self.curr_byte, b'.', b'e', b'E')))
                     {
-                        return Err(Error::ParsingError(
-                            ParseError::InvalidNumberParseError(
+                        return Err(Error::Parsing(
+                            ParseError::InvalidNumberParse(
                                 self.curr_byte as char,
                             ),
                         ));
@@ -442,8 +442,8 @@ impl Parser {
                         && !equals_in!(prev_byte, b'e', b'E')
                         && equals_in!(self.curr_byte, b'+', b'-')
                     {
-                        return Err(Error::ParsingError(
-                            ParseError::InvalidNumberParseError(
+                        return Err(Error::Parsing(
+                            ParseError::InvalidNumberParse(
                                 self.curr_byte as char,
                             ),
                         ));
@@ -461,8 +461,8 @@ impl Parser {
                     break;
                 }
                 _ => {
-                    return Err(Error::ParsingError(
-                        ParseError::InvalidNumberParseError(
+                    return Err(Error::Parsing(
+                        ParseError::InvalidNumberParse(
                             self.curr_byte as char,
                         ),
                     ));

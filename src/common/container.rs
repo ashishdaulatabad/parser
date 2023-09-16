@@ -272,7 +272,7 @@ impl Container {
                             .collect::<Vec<String>>()
                             .join(",\n")
                         + "\n"
-                        + &wspace
+                        + wspace
                         + "}"
                 }
             }

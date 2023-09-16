@@ -4,7 +4,7 @@ pub mod test;
 #[macro_export]
 macro_rules! object {
     ([$($elem:tt),*]) => {{
-        use crate::common::container::Container;
+        use $crate::common::container::Container;
         Container::Array(vec![$( Container::String($elem.to_owned()) ),*])
     }};
     ($str:expr) => {{
@@ -12,7 +12,7 @@ macro_rules! object {
     }};
     ($($key:tt : $value:tt),*) => {{
         use std::collections::HashMap;
-        use crate::common::container::Container;
+        use $crate::common::container::Container;
         let mut mp: HashMap<String, Container> = HashMap::new();
         $(
             mp.insert($key.to_owned(), Container::String($value));

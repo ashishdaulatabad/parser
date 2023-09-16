@@ -1,12 +1,8 @@
 
 mod tests {
-    use core::result::Result;
-    use crate::common::error::Error;
-    use crate::json_parser::parser::parse_str;
-
     #[test]
-    fn test_object() -> Result<(), Error> {
-        let a = parse_str(
+    fn test_object() -> Result<(), crate::common::error::Error> {
+        let a = crate::json_parser::parser::parse_str(
             r#"{
             "tell": "me",
             "where": 123.98,
