@@ -1,4 +1,3 @@
-
 mod tests {
     #[test]
     fn test_object() -> Result<(), crate::common::error::Error> {

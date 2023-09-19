@@ -76,10 +76,10 @@ impl Clone for Container {
             Self::Unsigned(element) => Self::Unsigned(*element),
             Self::Decimal(element) => Self::Decimal(*element),
             Self::Boolean(element) => Self::Boolean(*element),
-            Self::String(ref element) => Self::String(element.to_owned()),
-            Self::Array(ref array) => Self::Array(array.clone()),
-            Self::Object(ref object) => Self::Object(object.clone()),
-            Self::Set(ref set) => Self::Set(set.clone()),
+            Self::String(element) => Self::String(element.to_owned()),
+            Self::Array(array) => Self::Array(array.clone()),
+            Self::Object(object) => Self::Object(object.clone()),
+            Self::Set(set) => Self::Set(set.clone()),
             Self::Null => Self::Null,
         }
     }
@@ -91,7 +91,7 @@ impl Hash for Container {
             Self::Number(v) => v.hash(s),
             Self::Unsigned(v) => v.hash(s),
             Self::Boolean(v) => v.hash(s),
-            Self::String(ref v) => v.hash(s),
+            Self::String(v) => v.hash(s),
             _ => (),
         }
     }
@@ -122,17 +122,13 @@ impl PartialEq for Container {
                 arr.len() == oarr.len()
                     && arr.iter().zip(oarr).all(|(a, b)| a == b)
             }
-            (Self::Set(set), Self::Set(other_set)) => {
-                (set.len() == other_set.len())
-                    && set
-                        .iter()
-                        .all(|value| other_set.get(value) == Some(value))
+            (Self::Set(set), Self::Set(oset)) => {
+                (set.len() == oset.len())
+                    && set.iter().all(|v| oset.get(v) == Some(v))
             }
-            (Self::Object(map_object), Self::Object(other_map_object)) => {
-                (map_object.len() == other_map_object.len())
-                    && map_object.iter().all(|(key, value)| {
-                        other_map_object.get(key) == Some(value)
-                    })
+            (Self::Object(map), Self::Object(omap)) => {
+                (map.len() == omap.len())
+                    && map.iter().all(|(k, v)| omap.get(k) == Some(v))
             }
             (Self::Null, Self::Null) => true,
             _ => false,
@@ -143,7 +139,7 @@ impl PartialEq for Container {
 impl fmt::Display for Container {
     #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(&self.dump_object(true, 4, ""))
+        f.write_str(&self.dump_object(true, 4, 1))
     }
 }
 
@@ -175,12 +171,12 @@ impl Container {
     pub fn push(&mut self, val: Self) -> bool {
         match self {
             // Array push
-            Self::Array(ref mut value) => {
+            Self::Array(value) => {
                 value.push(val);
                 true
             }
-            Self::Set(ref mut value) => value.insert(val),
-            _ => false
+            Self::Set(value) => value.insert(val),
+            _ => false,
         }
     }
 
@@ -198,8 +194,8 @@ impl Container {
     pub fn dump_object(
         &self,
         indent: bool,
-        indent_size: u8,
-        wspace: &str,
+        indent_size: usize,
+        depth: usize,
     ) -> String {
         match self {
             Self::Array(value) => {
@@ -209,16 +205,16 @@ impl Container {
                     "[".to_owned()
                         + &value
                             .iter()
-                            .map(|e| e.dump_object(indent, indent_size, wspace))
+                            .map(|e| {
+                                e.dump_object(indent, indent_size, depth + 1)
+                            })
                             .collect::<Vec<String>>()
                             .join(",")
                         + "]"
                 } else {
-                    let space = wspace.to_owned()
-                        + (0..indent_size)
-                            .map(|_| ' ')
-                            .collect::<String>()
-                            .as_str();
+                    let wspace = " ".repeat((depth - 1) * indent_size);
+                    let space = " ".repeat(depth * indent_size);
+
                     "[\n".to_owned()
                         + &value
                             .iter()
@@ -227,13 +223,13 @@ impl Container {
                                     + &e.dump_object(
                                         indent,
                                         indent_size,
-                                        space.as_str(),
+                                        depth + 1,
                                     )
                             })
                             .collect::<Vec<String>>()
                             .join(",\n")
                         + "\n"
-                        + wspace
+                        + &wspace
                         + "]"
                 }
             }
@@ -246,17 +242,19 @@ impl Container {
                             .iter()
                             .map(|(k, v)| {
                                 format!("{:?}", k)
-                                    + &v.dump_object(indent, indent_size, "")
+                                    + &v.dump_object(
+                                        indent,
+                                        indent_size,
+                                        depth + 1,
+                                    )
                             })
                             .collect::<Vec<String>>()
                             .join(",")
                         + "}"
                 } else {
-                    let space = wspace.to_owned()
-                        + (0..indent_size)
-                            .map(|_| ' ')
-                            .collect::<String>()
-                            .as_str();
+                    let wspace = " ".repeat((depth - 1) * indent_size);
+                    let space = " ".repeat(depth * indent_size);
+
                     "{\n".to_owned()
                         + &map
                             .iter()
@@ -266,13 +264,13 @@ impl Container {
                                     + &v.dump_object(
                                         indent,
                                         indent_size,
-                                        &space,
+                                        depth + 1,
                                     )
                             })
                             .collect::<Vec<String>>()
                             .join(",\n")
                         + "\n"
-                        + wspace
+                        + &wspace
                         + "}"
                 }
             }
@@ -283,16 +281,16 @@ impl Container {
                     "(".to_owned()
                         + &value
                             .iter()
-                            .map(|e| e.dump_object(indent, indent_size, wspace))
+                            .map(|e| {
+                                e.dump_object(indent, indent_size, depth + 1)
+                            })
                             .collect::<Vec<String>>()
                             .join(",")
                         + ")"
                 } else {
-                    let space = wspace.to_owned()
-                        + (0..indent_size)
-                            .map(|_| ' ')
-                            .collect::<String>()
-                            .as_str();
+                    let wspace = " ".repeat((depth - 1) * indent_size);
+                    let space = " ".repeat(depth * indent_size);
+
                     "(\n".to_owned()
                         + &value
                             .iter()
@@ -301,13 +299,13 @@ impl Container {
                                     + &e.dump_object(
                                         indent,
                                         indent_size,
-                                        space.as_str(),
+                                        depth + 1,
                                     )
                             })
                             .collect::<Vec<String>>()
                             .join(",\n")
                         + "\n"
-                        + wspace
+                        + &wspace
                         + ")"
                 }
             }
@@ -315,7 +313,7 @@ impl Container {
             Self::Unsigned(value) => value.to_string(),
             Self::Boolean(value) => value.to_string(),
             Self::Decimal(value) => value.to_string(),
-            Self::String(ref value) => format!("{:?}", value),
+            Self::String(value) => format!("{:?}", value),
             Self::Null => "null".to_owned(),
         }
     }

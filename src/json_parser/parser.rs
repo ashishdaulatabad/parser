@@ -41,10 +41,14 @@ macro_rules! expect_next_bytes {
     ($parser:ident, $( $next_char:expr ),*) => ({
         $(
             match read_byte!($parser) {
-                Some($next_char) => { }
+                Some($next_char) => {}
                 val => {
                     return Err(Error::Parsing(ParseError::UnexpectedToken(
-                        if val.is_some() { val.unwrap() } else { b'\0' } as char,
+                        if val.is_some() {
+                            val.unwrap() as char
+                        } else {
+                            b'\0' as char
+                        },
                         $parser.curr_line,
                         $parser.curr_column
                     )));
@@ -256,13 +260,11 @@ impl Parser {
                 b'0'..=b'9' | b'.' | b'-' | b'+' => {
                     self.read_number(self.curr_byte)
                 }
-                _ => {
-                    Err(Error::Parsing(ParseError::UnexpectedToken(
-                        self.curr_byte as char,
-                        self.curr_line,
-                        self.curr_column,
-                    )))
-                }
+                _ => Err(Error::Parsing(ParseError::UnexpectedToken(
+                    self.curr_byte as char,
+                    self.curr_line,
+                    self.curr_column,
+                ))),
             }?;
             array_container.push(curr_container);
 
@@ -288,13 +290,11 @@ impl Parser {
                     }
                 } // End of current array/set
                 _ => {
-                    return Err(Error::Parsing(
-                        ParseError::UnexpectedToken(
-                            self.curr_byte as char,
-                            self.curr_line,
-                            self.curr_column,
-                        ),
-                    ));
+                    return Err(Error::Parsing(ParseError::UnexpectedToken(
+                        self.curr_byte as char,
+                        self.curr_line,
+                        self.curr_column,
+                    )));
                 }
             }
         }
@@ -311,13 +311,11 @@ impl Parser {
             let verification = match self.curr_byte {
                 b'\'' | b'\"' => self.read_string_in_quotes(self.curr_byte),
                 b'}' => break,
-                _ => {
-                    Err(Error::Parsing(ParseError::UnexpectedToken(
-                        self.curr_byte as char,
-                        self.curr_line,
-                        self.curr_column,
-                    )))
-                }
+                _ => Err(Error::Parsing(ParseError::UnexpectedToken(
+                    self.curr_byte as char,
+                    self.curr_line,
+                    self.curr_column,
+                ))),
             }?;
 
             // Skip inverted commas or brackets
@@ -335,11 +333,9 @@ impl Parser {
                     .read_array_or_set(get_closing_container!(self.curr_byte)),
                 b']' | b')' | b'}' => {
                     if self.curr_byte == b'}' {
-                        Err(Error::Parsing(
-                            ParseError::InvalidKeyValueFormat {
-                                reading_key: verification.as_string().unwrap(),
-                            },
-                        ))
+                        Err(Error::Parsing(ParseError::InvalidKeyValueFormat {
+                            reading_key: verification.as_string().unwrap(),
+                        }))
                     } else {
                         Err(Error::Parsing(
                             ParseError::ContainerParanthesisMismatch {
@@ -364,13 +360,11 @@ impl Parser {
                 b'0'..=b'9' | b'.' | b'-' | b'+' => {
                     self.read_number(self.curr_byte)
                 }
-                _ => {
-                    Err(Error::Parsing(ParseError::UnexpectedToken(
-                        self.curr_byte as char,
-                        self.curr_line,
-                        self.curr_column,
-                    )))
-                }
+                _ => Err(Error::Parsing(ParseError::UnexpectedToken(
+                    self.curr_byte as char,
+                    self.curr_line,
+                    self.curr_column,
+                ))),
             }?;
             object_container.insert_str(
                 verification.as_string().unwrap().as_str(),
@@ -397,13 +391,11 @@ impl Parser {
                     ));
                 }
                 _ => {
-                    return Err(Error::Parsing(
-                        ParseError::UnexpectedToken(
-                            self.curr_byte as char,
-                            self.curr_line,
-                            self.curr_column,
-                        ),
-                    ));
+                    return Err(Error::Parsing(ParseError::UnexpectedToken(
+                        self.curr_byte as char,
+                        self.curr_line,
+                        self.curr_column,
+                    )));
                 }
             }
         }
@@ -462,9 +454,7 @@ impl Parser {
                 }
                 _ => {
                     return Err(Error::Parsing(
-                        ParseError::InvalidNumberParse(
-                            self.curr_byte as char,
-                        ),
+                        ParseError::InvalidNumberParse(self.curr_byte as char),
                     ));
                 }
             }
