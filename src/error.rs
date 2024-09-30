@@ -20,6 +20,8 @@ pub enum ParseError {
     InvalidNumberParse(char),
 }
 
+impl core::error::Error for ParseError {}
+
 impl core::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -70,8 +72,10 @@ pub enum Error {
     Parsing(ParseError),
 }
 
+impl core::error::Error for Error {}
+
 impl core::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         match self {
             Error::Parsing(ref error_value) => f.write_str(
                 format!("\x1b[1;31mParse Error\x1b[0m:\n{}", error_value)

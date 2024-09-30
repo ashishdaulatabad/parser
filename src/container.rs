@@ -1,7 +1,7 @@
 use core::fmt;
 use core::hash::{Hash, Hasher};
 use core::ops::{Index, IndexMut};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 /// A Container that has ability to store different kind
 /// of data at a time. This includes basic data types like
@@ -14,27 +14,31 @@ use std::collections::{HashMap, HashSet};
 ///
 /// ## Examples for basic types
 /// ```
-/// let storage: Container = Container::Decimal(2e9+76);
-/// let mut str: Container = Container::String("here".to_string());
-/// println!("{}, and {}", str);          // prints "here" and 2000000076
+/// use json_parser::container::Container;
+/// let storage: Container = Container::Decimal(2e9+76.0);
+/// let mut str_container: Container = Container::String("here".to_string());
+/// assert_eq!(storage.get_real(), Some(2e9+76.0));
+/// assert_eq!(storage.get_string(), None);
+/// assert_eq!(str_container.get_string(), Some("here".into()));
+///
 /// ```
 ///
 /// And combination of such like:
 /// - Array (An expandable, randomly accessible list)
-/// - Set (A HashSet that stores unique values)
 /// - Object (A HashMap, that associates a string key with a value)
 ///
 /// ```
-/// let array_container: Container = Container::new_array();
+/// use json_parser::container::Container;
+/// let mut array_container: Container = Container::new_array();
 /// array_container.push(Container::Boolean(true));
 /// array_container.push(Container::Number(1<<32));
 /// array_container.push(Container::Decimal(2.34));
 ///
-/// let object_container: Container = Container::new_object();
-/// object_container.insert("key1".to_string(), Container::String("hello".to_string()));
+/// let mut object_container: Container = Container::new_object();
+/// object_container.insert_str("key1", Container::String("hello".to_string()));
 ///
 /// array_container.push(object_container);
-/// println!("{}", array_container); /// dumps [true,4294967296,2.34,{"key1":"hello"}] in pretty fashion
+///
 /// ```
 /// Todo:
 /// - [ ] Support Date and raw binary data type
@@ -57,12 +61,6 @@ pub enum Container {
     /// these containers in consecutive fashion
     /// of their insertion.
     Array(Vec<Container>),
-    /// Set containing unique container elements
-    /// identified by either
-    ///
-    /// - Value or
-    /// - Values inside these elements
-    Set(HashSet<Container>),
     /// Key value pair, where key is string
     /// and value can be any of these types
     Object(HashMap<String, Container>),
@@ -79,7 +77,6 @@ impl Clone for Container {
             Self::String(element) => Self::String(element.to_owned()),
             Self::Array(array) => Self::Array(array.clone()),
             Self::Object(object) => Self::Object(object.clone()),
-            Self::Set(set) => Self::Set(set.clone()),
             Self::Null => Self::Null,
         }
     }
@@ -122,10 +119,6 @@ impl PartialEq for Container {
                 arr.len() == oarr.len()
                     && arr.iter().zip(oarr).all(|(a, b)| a == b)
             }
-            (Self::Set(set), Self::Set(oset)) => {
-                (set.len() == oset.len())
-                    && set.iter().all(|v| oset.get(v) == Some(v))
-            }
             (Self::Object(map), Self::Object(omap)) => {
                 (map.len() == omap.len())
                     && map.iter().all(|(k, v)| omap.get(k) == Some(v))
@@ -158,12 +151,6 @@ impl Container {
         Self::Array(Vec::new())
     }
 
-    /// Returns new set
-    #[inline(always)]
-    pub fn new_set() -> Self {
-        Self::Set(HashSet::new())
-    }
-
     /// Array: Push an item into array or an element into set:
     ///
     /// Returns `false` if element cannot be added in container
@@ -175,7 +162,6 @@ impl Container {
                 value.push(val);
                 true
             }
-            Self::Set(value) => value.insert(val),
             _ => false,
         }
     }
@@ -274,54 +260,12 @@ impl Container {
                         + "}"
                 }
             }
-            Self::Set(value) => {
-                if value.is_empty() {
-                    "()".to_owned()
-                } else if !indent {
-                    "(".to_owned()
-                        + &value
-                            .iter()
-                            .map(|e| {
-                                e.dump_object(indent, indent_size, depth + 1)
-                            })
-                            .collect::<Vec<String>>()
-                            .join(",")
-                        + ")"
-                } else {
-                    let wspace = " ".repeat((depth - 1) * indent_size);
-                    let space = " ".repeat(depth * indent_size);
-
-                    "(\n".to_owned()
-                        + &value
-                            .iter()
-                            .map(|e| {
-                                space.to_owned()
-                                    + &e.dump_object(
-                                        indent,
-                                        indent_size,
-                                        depth + 1,
-                                    )
-                            })
-                            .collect::<Vec<String>>()
-                            .join(",\n")
-                        + "\n"
-                        + &wspace
-                        + ")"
-                }
-            }
             Self::Number(value) => value.to_string(),
             Self::Unsigned(value) => value.to_string(),
             Self::Boolean(value) => value.to_string(),
             Self::Decimal(value) => value.to_string(),
             Self::String(value) => format!("{:?}", value),
             Self::Null => "null".to_owned(),
-        }
-    }
-
-    pub fn as_string(&self) -> Option<String> {
-        match self {
-            Self::String(value) => Some(value.to_owned()),
-            _ => None,
         }
     }
 
@@ -372,7 +316,7 @@ impl Container {
 
     define_type_checks!(Object, is_object);
 
-    define_type_checks!(Set, is_set);
+    define_type_checks!(Array, is_array);
 
     pub fn is_null(&self) -> bool {
         *self == Self::Null
@@ -383,7 +327,6 @@ impl Container {
         match self {
             Self::Array(value) => value.len(),
             Self::Object(value) => value.len(),
-            Self::Set(value) => value.len(),
             Self::String(value) => value.len(),
             _ => 1,
         }
