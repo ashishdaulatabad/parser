@@ -54,6 +54,14 @@ mod tests {
     }
 
     #[test]
+    fn test_array() -> Result<(), Box<dyn core::error::Error>> {
+        assert!(parse_str("[1]").is_ok_and(|c| c.is_array() && c[0].is_unsigned()));
+        assert!(parse_str("[\"\"],").is_err());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_object() -> Result<(), Box<dyn core::error::Error>> {
         let a = parse_str(
             r#"{

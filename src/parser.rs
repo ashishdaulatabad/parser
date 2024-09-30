@@ -116,7 +116,7 @@ impl Parser {
     pub fn parse_str(
         &mut self,
     ) -> Result<Container, Box<dyn core::error::Error>> {
-        match self.get_next_byte() {
+        let answer = match self.get_next_byte() {
             Some(b'\'' | b'"') => Ok(self.read_string_in_quotes()?),
             Some(b'[') => Ok(self.read_array()?),
             Some(b'{') => Ok(self.read_objects()?),
@@ -172,6 +172,16 @@ impl Parser {
                 self.curr_column,
             ))
             .into()),
+        };
+
+        if let Some(chr) = self.get_byte() {
+            Err(Error::Parsing(ParseError::UnexpectedToken(
+                chr as char,
+                self.curr_line,
+                self.curr_column
+            )).into())
+        } else {
+            answer
         }
     }
 
