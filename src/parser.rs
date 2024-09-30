@@ -250,6 +250,7 @@ impl Parser {
     fn read_array(&mut self) -> Result<Container, Box<dyn core::error::Error>> {
         // Current byte is a quote, read and move to next one
         let mut array_container = Container::new_array();
+        let mut recorded_one = false;
 
         'parsing_array: loop {
             let curr_container = match self.get_byte() {
@@ -268,7 +269,12 @@ impl Parser {
                     expect_next_bytes!(self, b'u', b'l', b'l');
                     Ok(Container::Null)
                 }
-                Some(b']') => break,
+                Some(b']') if !recorded_one => break,
+                Some(b']') if recorded_one => Err(Error::Parsing(ParseError::UnexpectedToken(
+                   ']',
+                   self.curr_column,
+                   self.curr_line
+                )).into()),
                 Some(b'}') => Err(Error::Parsing(
                     ParseError::ContainerParanthesisMismatch {
                         opening_container: ']',
@@ -288,6 +294,7 @@ impl Parser {
                 .into()),
             }?;
             array_container.push(curr_container);
+            recorded_one = true;
 
             match self.get_byte() {
                 Some(b',') => continue 'parsing_array,
@@ -323,11 +330,18 @@ impl Parser {
         &mut self,
     ) -> Result<Container, Box<dyn core::error::Error>> {
         let mut object_container = Container::new_object();
+        let mut recorded_one = false; 
         'parsing_objects: loop {
             // First: read the key
             let verification = match self.get_byte() {
                 Some(b'"') => self.read_string_in_quotes(),
-                Some(b'}') => break,
+                Some(b'}') if !recorded_one => break,
+                Some(b'}') if recorded_one => Err(Error::Parsing(ParseError::UnexpectedToken(
+                    '}',
+                    self.curr_line,
+                    self.curr_column,
+                ))
+                .into()),
                 None => {
                     return Err(Error::Parsing(ParseError::EndOfBuffer).into())
                 }
@@ -401,6 +415,7 @@ impl Parser {
                 verification.get_string().unwrap().as_str(),
                 assoc_value,
             );
+            recorded_one = true;
 
             match self.get_byte() {
                 Some(b',') => continue 'parsing_objects,

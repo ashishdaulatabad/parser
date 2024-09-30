@@ -52,11 +52,19 @@ mod tests {
             })));
         Ok(())
     }
+    #[test]
+    fn test_string_incomplete() -> Result<(), Box<dyn core::error::Error>> {
+        assert!(parse_str("{\"a\": \"a}").is_err());
+
+        Ok(())
+    }
 
     #[test]
     fn test_array() -> Result<(), Box<dyn core::error::Error>> {
         assert!(parse_str("[1]").is_ok_and(|c| c.is_array() && c[0].is_unsigned()));
         assert!(parse_str("[\"\"],").is_err());
+        assert!(parse_str("[\"\",]").is_err());
+        assert!(parse_str("[[[[[[[[[[[[[[]]]]]]]]]]]]]]").is_ok());
 
         Ok(())
     }
