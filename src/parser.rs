@@ -226,6 +226,9 @@ impl Parser {
                     }
                     break;
                 }
+                None => return Err(
+                    Error::Parsing(ParseError::EndOfBuffer).into()
+                ),
                 _ => {}
             }
         }
