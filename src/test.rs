@@ -28,11 +28,19 @@ mod tests {
             ("-.5e-5", false, Container::Null),
             ("-1-e5", false, Container::Null),
             ("-12132e5", true, Container::Decimal(-12132e5)),
-        ].iter().for_each(|(string, good, compare)| {
+        ]
+        .iter()
+        .for_each(|(string, good, compare)| {
             if *good {
-                assert!(parse_str(string).is_ok_and(|c| c == *compare), "{string} failed: Expected parser as OK")
+                assert!(
+                    parse_str(string).is_ok_and(|c| c == *compare),
+                    "{string} failed: Expected parser as OK"
+                )
             } else {
-                assert!(parse_str(string).is_err(), "{string} failed: Expected parser as FAIL")
+                assert!(
+                    parse_str(string).is_err(),
+                    "{string} failed: Expected parser as FAIL"
+                )
             }
         });
 

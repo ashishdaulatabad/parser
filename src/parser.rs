@@ -30,19 +30,13 @@ pub struct Parser {
     /// Adjustment when a certain number is read.
     num_read: bool,
     // Nesting Count: If too many nested objects, just quit
-    nested_count: u16
-}
-
-macro_rules! read_byte {
-    ($parser:ident) => {
-        $parser.get_next_byte()
-    };
+    nested_count: u16,
 }
 
 macro_rules! expect_next_bytes {
     ($parser:ident, $( $next_char:expr ),*) => ({
         $(
-            match read_byte!($parser) {
+            match $parser.get_byte() {
                 Some($next_char) => {}
                 None => return Err(Error::Parsing(ParseError::EndOfBuffer).into()),
                 Some(r) => {
@@ -77,7 +71,7 @@ impl Parser {
             curr_column: 1,
             len: str_stream.len(),
             num_read: false,
-            nested_count: 0
+            nested_count: 0,
         }
     }
 
@@ -189,10 +183,14 @@ impl Parser {
         }
     }
 
-    fn slice_to_utf8(slice: &[u8]) -> Result<&str, Box<dyn core::error::Error>> {
+    fn slice_to_utf8(
+        slice: &[u8],
+    ) -> Result<&str, Box<dyn core::error::Error>> {
         match core::str::from_utf8(slice) {
             Ok(sl) => Ok(sl),
-            Err(_) => Err(Error::Parsing(ParseError::InvalidUTF8Parsing).into())
+            Err(_) => {
+                Err(Error::Parsing(ParseError::InvalidUTF8Parsing).into())
+            }
         }
     }
 
@@ -227,13 +225,14 @@ impl Parser {
                             )
                         }
                         Some(c) => {
-                            return Err(
-                                Error::Parsing(ParseError::UnexpectedToken(
+                            return Err(Error::Parsing(
+                                ParseError::UnexpectedToken(
                                     c as char,
                                     self.curr_line,
-                                    self.curr_column
-                                )).into()
+                                    self.curr_column,
+                                ),
                             )
+                            .into())
                         }
                     }
                     start = self.offset;
@@ -264,7 +263,10 @@ impl Parser {
         // Current byte is a quote, read and move to next one
         self.nested_count += 1;
         if self.nested_count > NEST_LIMIT {
-            return Err(Error::Parsing(ParseError::NestedDepthExceeded(self.nested_count)).into()); 
+            return Err(Error::Parsing(ParseError::NestedDepthExceeded(
+                self.nested_count,
+            ))
+            .into());
         }
 
         let mut array_container = Container::new_array();
@@ -353,7 +355,10 @@ impl Parser {
     ) -> Result<Container, Box<dyn core::error::Error>> {
         self.nested_count += 1;
         if self.nested_count > NEST_LIMIT {
-            return Err(Error::Parsing(ParseError::NestedDepthExceeded(self.nested_count)).into()); 
+            return Err(Error::Parsing(ParseError::NestedDepthExceeded(
+                self.nested_count,
+            ))
+            .into());
         }
 
         let mut object_container = Container::new_object();
@@ -427,7 +432,9 @@ impl Parser {
                     expect_next_bytes!(self, b'u', b'l', b'l');
                     Ok(Container::Null)
                 }
-                val @ Some(b'0'..=b'9' | b'-') => self.read_number(val.unwrap()),
+                val @ Some(b'0'..=b'9' | b'-') => {
+                    self.read_number(val.unwrap())
+                }
                 None => {
                     return Err(Error::Parsing(ParseError::EndOfBuffer).into())
                 }
@@ -476,7 +483,6 @@ impl Parser {
 
     /// Read a number from given input
     /// Returns Error if an unexpected token occurs.
-    #[allow(unused_variables)]
     fn read_number(
         &mut self,
         byte_read: u8,
@@ -493,7 +499,7 @@ impl Parser {
 
         loop {
             prev_byte = match self.get_next_byte() {
-                val @ Some(b'.') if read_dot => {
+                Some(b'.') if read_dot => {
                     return Err(Error::Parsing(
                         ParseError::InvalidNumberParse(b'.' as char),
                     )
@@ -522,8 +528,8 @@ impl Parser {
                     let chr = val.unwrap();
                     // We've not read the exponent character
                     // We've read exponent but we can still expect the sign
-                    expect_number_after_exp = chr == b'.' || (!read_exp
-                        && equals_in!(chr, b'e', b'E'))
+                    expect_number_after_exp = chr == b'.'
+                        || (!read_exp && equals_in!(chr, b'e', b'E'))
                         || (read_exp
                             && !sign_exp
                             && equals_in!(prev_byte, b'e', b'E')
