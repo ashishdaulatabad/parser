@@ -16,6 +16,30 @@ mod tests {
     }
 
     #[test]
+    fn test_err_numbers() -> Result<(), Box<dyn core::error::Error>> {
+        [
+            ("12", true, Container::Unsigned(12)),
+            ("24.33", true, Container::Decimal(24.33)),
+            (".5", false, Container::Null),
+            ("1e5", true, Container::Decimal(1e5)),
+            ("5e-6", true, Container::Decimal(5e-6)),
+            ("-6e-5", true, Container::Decimal(-6e-5)),
+            ("-7.5e-5", true, Container::Decimal(-7.5e-5)),
+            ("-.5e-5", false, Container::Null),
+            ("-1-e5", false, Container::Null),
+            ("-12132e5", true, Container::Decimal(-12132e5)),
+        ].iter().for_each(|(string, good, compare)| {
+            if *good {
+                assert!(parse_str(string).is_ok_and(|c| c == *compare), "{string} failed: Expected parser as OK")
+            } else {
+                assert!(parse_str(string).is_err(), "{string} failed: Expected parser as FAIL")
+            }
+        });
+
+        Ok(())
+    }
+
+    #[test]
     fn test_primitive() -> Result<(), Box<dyn core::error::Error>> {
         assert!(parse_str("12")
             .is_ok_and(|c| c.get_uint().is_some_and(|d| d == 12)));
@@ -75,6 +99,9 @@ mod tests {
         assert!(parse_str("[1.2e-++3]").is_err());
         assert!(parse_str("[1 .2e3]").is_err());
         assert!(parse_str("[1.2e3]").is_ok());
+        assert!(parse_str("[.2e3]").is_err());
+        assert!(parse_str("[-.1]").is_err());
+        assert!(parse_str("[.-1]").is_err());
 
         Ok(())
     }

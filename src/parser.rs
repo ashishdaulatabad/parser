@@ -120,9 +120,7 @@ impl Parser {
             Some(b'\'' | b'"') => Ok(self.read_string_in_quotes()?),
             Some(b'[') => Ok(self.read_array()?),
             Some(b'{') => Ok(self.read_objects()?),
-            val @ Some(b'0'..=b'9' | b'-') => {
-                self.read_number(val.unwrap())
-            }
+            val @ Some(b'0'..=b'9' | b'-') => self.read_number(val.unwrap()),
             Some(b't') => {
                 expect_next_bytes!(self, b'r', b'u', b'e');
 
@@ -404,9 +402,7 @@ impl Parser {
                     expect_next_bytes!(self, b'u', b'l', b'l');
                     Ok(Container::Null)
                 }
-                val @ Some(b'0'..=b'9') => {
-                    self.read_number(val.unwrap())
-                }
+                val @ Some(b'0'..=b'9') => self.read_number(val.unwrap()),
                 None => {
                     return Err(Error::Parsing(ParseError::EndOfBuffer).into())
                 }
@@ -459,7 +455,7 @@ impl Parser {
         &mut self,
         byte_read: u8,
     ) -> Result<Container, Box<dyn core::error::Error>> {
-        let (mut read_dot, sign_read, mut prev_byte, is_sign) = (
+        let (mut read_dot, sign, mut prev_byte, is_sign) = (
             byte_read == b'.',
             if byte_read == b'-' { b'-' } else { b'+' },
             byte_read,
@@ -471,41 +467,33 @@ impl Parser {
 
         loop {
             prev_byte = match self.get_next_byte() {
+                val @ Some(b'.') if read_dot => {
+                    return Err(Error::Parsing(
+                        ParseError::InvalidNumberParse(b'.' as char),
+                    )
+                    .into());
+                }
+                val @ Some(b'.' | b'e' | b'E')
+                    if (read_exp || prev_byte == b'-') =>
+                {
+                    return Err(Error::Parsing(
+                        ParseError::InvalidNumberParse(val.unwrap() as char),
+                    )
+                    .into());
+                }
+                val @ Some(b'-' | b'+')
+                    if (is_sign && equals_in!(prev_byte, b'+', b'-')
+                        || read_exp && !equals_in!(prev_byte, b'e', b'E')) =>
+                {
+                    return Err(Error::Parsing(ParseError::UnexpectedToken(
+                        val.unwrap() as char,
+                        self.curr_line,
+                        self.curr_column,
+                    ))
+                    .into());
+                }
                 val @ Some(b'0'..=b'9' | b'.' | b'e' | b'E' | b'+' | b'-') => {
                     let chr = val.unwrap();
-                    if (read_dot && chr == b'.')
-                        || (read_exp && (equals_in!(chr, b'.', b'e', b'E')))
-                    {
-                        return Err(Error::Parsing(
-                            ParseError::InvalidNumberParse(chr as char),
-                        )
-                        .into());
-                    }
-
-                    if is_sign
-                        && equals_in!(prev_byte, b'+', b'-')
-                        && equals_in!(chr, b'+', b'-')
-                    {
-                        return Err(Error::Parsing(
-                            ParseError::UnexpectedToken(
-                                chr as char,
-                                self.curr_line,
-                                self.curr_column,
-                            ),
-                        )
-                        .into());
-                    }
-
-                    if read_exp
-                        && !equals_in!(prev_byte, b'e', b'E')
-                        && equals_in!(chr, b'+', b'-')
-                    {
-                        return Err(Error::Parsing(
-                            ParseError::InvalidNumberParse(chr as char),
-                        )
-                        .into());
-                    }
-
                     // We've not read the exponent character
                     // We've read exponent but we can still expect the sign
                     expect_number_after_exp = (!read_exp
@@ -557,7 +545,7 @@ impl Parser {
 
         if read_dot || read_exp {
             Ok(Container::Decimal(str_slice.parse::<f64>().unwrap()))
-        } else if sign_read == b'-' {
+        } else if sign == b'-' {
             Ok(Container::Number(str_slice.parse::<i64>().unwrap()))
         } else {
             Ok(Container::Unsigned(str_slice.parse::<u64>().unwrap()))
