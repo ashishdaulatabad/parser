@@ -178,8 +178,9 @@ impl Parser {
             Err(Error::Parsing(ParseError::UnexpectedToken(
                 chr as char,
                 self.curr_line,
-                self.curr_column
-            )).into())
+                self.curr_column,
+            ))
+            .into())
         } else {
             answer
         }
@@ -236,9 +237,9 @@ impl Parser {
                     }
                     break;
                 }
-                None => return Err(
-                    Error::Parsing(ParseError::EndOfBuffer).into()
-                ),
+                None => {
+                    return Err(Error::Parsing(ParseError::EndOfBuffer).into())
+                }
                 _ => {}
             }
         }
@@ -270,11 +271,14 @@ impl Parser {
                     Ok(Container::Null)
                 }
                 Some(b']') if !recorded_one => break,
-                Some(b']') if recorded_one => Err(Error::Parsing(ParseError::UnexpectedToken(
-                   ']',
-                   self.curr_column,
-                   self.curr_line
-                )).into()),
+                Some(b']') if recorded_one => {
+                    Err(Error::Parsing(ParseError::UnexpectedToken(
+                        ']',
+                        self.curr_column,
+                        self.curr_line,
+                    ))
+                    .into())
+                }
                 Some(b'}') => Err(Error::Parsing(
                     ParseError::ContainerParanthesisMismatch {
                         opening_container: ']',
@@ -330,18 +334,20 @@ impl Parser {
         &mut self,
     ) -> Result<Container, Box<dyn core::error::Error>> {
         let mut object_container = Container::new_object();
-        let mut recorded_one = false; 
+        let mut recorded_one = false;
         'parsing_objects: loop {
             // First: read the key
             let verification = match self.get_byte() {
                 Some(b'"') => self.read_string_in_quotes(),
                 Some(b'}') if !recorded_one => break,
-                Some(b'}') if recorded_one => Err(Error::Parsing(ParseError::UnexpectedToken(
-                    '}',
-                    self.curr_line,
-                    self.curr_column,
-                ))
-                .into()),
+                Some(b'}') if recorded_one => {
+                    Err(Error::Parsing(ParseError::UnexpectedToken(
+                        '}',
+                        self.curr_line,
+                        self.curr_column,
+                    ))
+                    .into())
+                }
                 None => {
                     return Err(Error::Parsing(ParseError::EndOfBuffer).into())
                 }
@@ -453,17 +459,18 @@ impl Parser {
         &mut self,
         byte_read: u8,
     ) -> Result<Container, Box<dyn core::error::Error>> {
-        let (mut read_dot, sign_read, mut prev_byte) = (
+        let (mut read_dot, sign_read, mut prev_byte, is_sign) = (
             byte_read == b'.',
             if byte_read == b'-' { b'-' } else { b'+' },
             byte_read,
+            byte_read == b'+' || byte_read == b'-',
         );
         let abrupt_end;
-        let (mut read_exp, mut sign_exp, start) =
-            (false, false, self.offset - 1);
+        let (mut read_exp, mut sign_exp, start, mut expect_number_after_exp) =
+            (false, false, self.offset - 1, false);
 
         loop {
-            prev_byte = match self.get_byte() {
+            prev_byte = match self.get_next_byte() {
                 val @ Some(b'0'..=b'9' | b'.' | b'e' | b'E' | b'+' | b'-') => {
                     let chr = val.unwrap();
                     if (read_dot && chr == b'.')
@@ -471,6 +478,20 @@ impl Parser {
                     {
                         return Err(Error::Parsing(
                             ParseError::InvalidNumberParse(chr as char),
+                        )
+                        .into());
+                    }
+
+                    if is_sign
+                        && equals_in!(prev_byte, b'+', b'-')
+                        && equals_in!(chr, b'+', b'-')
+                    {
+                        return Err(Error::Parsing(
+                            ParseError::UnexpectedToken(
+                                chr as char,
+                                self.curr_line,
+                                self.curr_column,
+                            ),
                         )
                         .into());
                     }
@@ -485,16 +506,33 @@ impl Parser {
                         .into());
                     }
 
+                    // We've not read the exponent character
+                    // We've read exponent but we can still expect the sign
+                    expect_number_after_exp = (!read_exp
+                        && equals_in!(chr, b'e', b'E'))
+                        || (read_exp
+                            && !sign_exp
+                            && equals_in!(prev_byte, b'e', b'E')
+                            && equals_in!(chr, b'-', b'+'));
                     read_exp |= equals_in!(chr, b'e', b'E');
                     sign_exp |= read_exp
                         && equals_in!(prev_byte, b'e', b'E')
                         && equals_in!(chr, b'-', b'+');
                     read_dot |= read_exp || chr == b'.';
+
                     chr
                 }
                 val @ Some(b' ' | 9..=13 | b',' | b']' | b'}') | val @ None => {
                     (self.num_read, abrupt_end) = (true, val.is_none());
-                    break;
+
+                    if !expect_number_after_exp {
+                        break;
+                    } else {
+                        return Err(Error::Parsing(
+                            ParseError::InvalidNumberParse(b'\0' as char),
+                        )
+                        .into());
+                    }
                 }
                 Some(c) => {
                     return Err(Error::Parsing(

@@ -30,18 +30,21 @@ mod tests {
             .is_ok_and(|c| c.get_bool().is_some_and(|d| d == true)));
         assert!(parse_str("false")
             .is_ok_and(|c| c.get_bool().is_some_and(|d| d == false)));
-        assert!(parse_str("\"false\"")
-            .is_ok_and(|c| c.get_string().is_some_and(|d| d == "false".to_owned())));
+        assert!(parse_str("\"false\"").is_ok_and(|c| c
+            .get_string()
+            .is_some_and(|d| d == "false".to_owned())));
 
         Ok(())
     }
-    
+
     #[test]
     fn test_escaped_string() -> Result<(), Box<dyn core::error::Error>> {
-        assert!(parse_str("\"Someone said \\\"The brown fox jumps over the lazy dog.\\\"\"")
-            .is_ok_and(|c| c.get_string().is_some_and(|d|{
-                d == "Someone said \"The brown fox jumps over the lazy dog.\""
-            })));
+        assert!(parse_str(
+            "\"Someone said \\\"The brown fox jumps over the lazy dog.\\\"\""
+        )
+        .is_ok_and(|c| c.get_string().is_some_and(|d| {
+            d == "Someone said \"The brown fox jumps over the lazy dog.\""
+        })));
         assert!(parse_str("\"Encoding new line\\ncan be done as well. This is how\\t we do it.\"")
             .is_ok_and(|c| c.get_string().is_some_and(|d|{
                 d == "Encoding new line\ncan be done as well. This is how\t we do it."
@@ -61,10 +64,17 @@ mod tests {
 
     #[test]
     fn test_array() -> Result<(), Box<dyn core::error::Error>> {
-        assert!(parse_str("[1]").is_ok_and(|c| c.is_array() && c[0].is_unsigned()));
+        assert!(
+            parse_str("[1]").is_ok_and(|c| c.is_array() && c[0].is_unsigned())
+        );
         assert!(parse_str("[\"\"],").is_err());
         assert!(parse_str("[\"\",]").is_err());
         assert!(parse_str("[[[[[[[[[[[[[[]]]]]]]]]]]]]]").is_ok());
+        assert!(parse_str("[++1111]").is_err());
+        assert!(parse_str("[1.2e-]").is_err());
+        assert!(parse_str("[1.2e-++3]").is_err());
+        assert!(parse_str("[1 .2e3]").is_err());
+        assert!(parse_str("[1.2e3]").is_ok());
 
         Ok(())
     }
