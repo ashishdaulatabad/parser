@@ -3,6 +3,8 @@ use super::error::Error;
 use super::error::ParseError;
 use core::result::Result;
 
+const NEST_LIMIT: u16 = 5000;
+
 /// Single-threaded parsing module, with an intent to parse the
 /// files faster with handling run-time errors (hopefully), considering two modes
 /// of parsing:
@@ -27,6 +29,8 @@ pub struct Parser {
     len: usize,
     /// Adjustment when a certain number is read.
     num_read: bool,
+    // Nesting Count: If too many nested objects, just quit
+    nested_count: u16
 }
 
 macro_rules! read_byte {
@@ -73,6 +77,7 @@ impl Parser {
             curr_column: 1,
             len: str_stream.len(),
             num_read: false,
+            nested_count: 0
         }
     }
 
@@ -257,6 +262,11 @@ impl Parser {
     /// Parse values to store in an array
     fn read_array(&mut self) -> Result<Container, Box<dyn core::error::Error>> {
         // Current byte is a quote, read and move to next one
+        self.nested_count += 1;
+        if self.nested_count > NEST_LIMIT {
+            return Err(Error::Parsing(ParseError::NestedDepthExceeded(self.nested_count)).into()); 
+        }
+
         let mut array_container = Container::new_array();
         let mut recorded_one = false;
 
@@ -333,6 +343,7 @@ impl Parser {
             }
         }
 
+        self.nested_count -= 1;
         Ok(array_container)
     }
 
@@ -340,6 +351,11 @@ impl Parser {
     fn read_objects(
         &mut self,
     ) -> Result<Container, Box<dyn core::error::Error>> {
+        self.nested_count += 1;
+        if self.nested_count > NEST_LIMIT {
+            return Err(Error::Parsing(ParseError::NestedDepthExceeded(self.nested_count)).into()); 
+        }
+
         let mut object_container = Container::new_object();
         let mut recorded_one = false;
         'parsing_objects: loop {
@@ -454,6 +470,7 @@ impl Parser {
             }
         }
 
+        self.nested_count -= 1;
         Ok(object_container)
     }
 

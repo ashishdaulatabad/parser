@@ -6,6 +6,8 @@ pub enum ParseError {
     UnexpectedToken(char, usize, usize),
     /// Invalid UTF-8 character
     InvalidUTF8Parsing,
+    /// Nested Depth Exceeded
+    NestedDepthExceeded(u16),
     /// Raised whenever parser reaches the end of the
     /// buffer without proper handling, but might allow
     /// creating the object even after failure.
@@ -34,6 +36,7 @@ impl core::fmt::Display for ParseError {
                 )
                 .as_str(),
             ),
+            ParseError::NestedDepthExceeded(c) => f.write_str(format!("NestedDepthExceeded, >{c}").as_str()),
             ParseError::InvalidUTF8Parsing => f.write_str("Invalid UTF-8 Value found while decoding strings."),
             ParseError::ContainerParanthesisMismatch {
                 opening_container,

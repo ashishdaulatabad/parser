@@ -74,9 +74,7 @@ mod tests {
                 d == "Encoding new line\ncan be done as well. This is how\t we do it."
             })));
         assert!(parse_str("\"Encoding new line\\ncan be done as well. This is how\\a we do it.\"")
-            .is_ok_and(|c| c.get_string().is_some_and(|d|{
-                d == "Encoding new line\ncan be done as well. This is how\\a we do it."
-            })));
+            .is_err());
         Ok(())
     }
     #[test]
