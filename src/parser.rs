@@ -184,8 +184,14 @@ impl Parser {
         }
     }
 
+    fn slice_to_utf8(slice: &[u8]) -> Result<&str, Box<dyn core::error::Error>> {
+        match core::str::from_utf8(slice) {
+            Ok(sl) => Ok(sl),
+            Err(_) => Err(Error::Parsing(ParseError::InvalidUTF8Parsing).into())
+        }
+    }
+
     /// Read string values that are stored
-    ///
     fn read_string_in_quotes(
         &mut self,
     ) -> Result<Container, Box<dyn core::error::Error>> {
@@ -197,18 +203,16 @@ impl Parser {
                 // Handle this by storing current slice and create a new slice again.
                 Some(b'\\') => {
                     unsafe {
-                        final_string.push_str(core::str::from_utf8_unchecked(
+                        final_string.push_str(Self::slice_to_utf8(
                             core::slice::from_raw_parts(
                                 self.container.add(start),
                                 self.offset - start - 1,
                             ),
-                        ));
+                        )?);
                     }
 
                     match self.get_byte() {
-                        Some(b'"') => {
-                            final_string.push('"');
-                        }
+                        Some(b'"') => final_string.push('"'),
                         Some(b'r') => final_string.push('\r'),
                         Some(b't') => final_string.push('\t'),
                         Some(b'n') => final_string.push('\n'),
@@ -218,20 +222,25 @@ impl Parser {
                             )
                         }
                         Some(c) => {
-                            final_string.push('\\');
-                            final_string.push(c as char);
+                            return Err(
+                                Error::Parsing(ParseError::UnexpectedToken(
+                                    c as char,
+                                    self.curr_line,
+                                    self.curr_column
+                                )).into()
+                            )
                         }
                     }
                     start = self.offset;
                 }
                 Some(b'"') => {
                     unsafe {
-                        final_string.push_str(core::str::from_utf8_unchecked(
+                        final_string.push_str(Self::slice_to_utf8(
                             core::slice::from_raw_parts(
                                 self.container.add(start),
                                 self.offset - start - 1,
                             ),
-                        ));
+                        )?);
                     }
                     break;
                 }

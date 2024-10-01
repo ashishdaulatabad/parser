@@ -4,6 +4,8 @@
 pub enum ParseError {
     /// Raised whenever a certain token is not accepted
     UnexpectedToken(char, usize, usize),
+    /// Invalid UTF-8 character
+    InvalidUTF8Parsing,
     /// Raised whenever parser reaches the end of the
     /// buffer without proper handling, but might allow
     /// creating the object even after failure.
@@ -32,6 +34,7 @@ impl core::fmt::Display for ParseError {
                 )
                 .as_str(),
             ),
+            ParseError::InvalidUTF8Parsing => f.write_str("Invalid UTF-8 Value found while decoding strings."),
             ParseError::ContainerParanthesisMismatch {
                 opening_container,
                 closing_container,
