@@ -120,7 +120,7 @@ impl Parser {
             Some(b'\'' | b'"') => Ok(self.read_string_in_quotes()?),
             Some(b'[') => Ok(self.read_array()?),
             Some(b'{') => Ok(self.read_objects()?),
-            val @ Some(b'0'..=b'9' | b'+' | b'-') => {
+            val @ Some(b'0'..=b'9' | b'-') => {
                 self.read_number(val.unwrap())
             }
             Some(b't') => {
@@ -286,7 +286,7 @@ impl Parser {
                     },
                 )
                 .into()),
-                val @ Some(b'0'..=b'9' | b'.' | b'-' | b'+') => {
+                val @ Some(b'0'..=b'9' | b'-') => {
                     self.read_number(val.unwrap())
                 }
                 None => Err(Error::Parsing(ParseError::EndOfBuffer).into()),
