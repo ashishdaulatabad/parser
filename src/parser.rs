@@ -427,7 +427,7 @@ impl Parser {
                     expect_next_bytes!(self, b'u', b'l', b'l');
                     Ok(Container::Null)
                 }
-                val @ Some(b'0'..=b'9') => self.read_number(val.unwrap()),
+                val @ Some(b'0'..=b'9' | b'-') => self.read_number(val.unwrap()),
                 None => {
                     return Err(Error::Parsing(ParseError::EndOfBuffer).into())
                 }
