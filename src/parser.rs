@@ -496,7 +496,7 @@ impl Parser {
                     let chr = val.unwrap();
                     // We've not read the exponent character
                     // We've read exponent but we can still expect the sign
-                    expect_number_after_exp = (!read_exp
+                    expect_number_after_exp = chr == b'.' || (!read_exp
                         && equals_in!(chr, b'e', b'E'))
                         || (read_exp
                             && !sign_exp
