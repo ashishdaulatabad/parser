@@ -28,6 +28,7 @@ mod tests {
             ("-.5e-5", false, Container::Null),
             ("-1-e5", false, Container::Null),
             ("-12132e5", true, Container::Decimal(-12132e5)),
+            ("321321321342132412341234231412", false, Container::Null),
         ]
         .iter()
         .for_each(|(string, good, compare)| {
@@ -107,6 +108,7 @@ mod tests {
         assert!(parse_str("[1.2e3]").is_ok());
         assert!(parse_str("[.2e3]").is_err());
         assert!(parse_str("[-.1]").is_err());
+        assert!(parse_str("[-0.1]").is_ok());
         assert!(parse_str("[.-1]").is_err());
 
         Ok(())

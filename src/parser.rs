@@ -481,6 +481,16 @@ impl Parser {
         Ok(object_container)
     }
 
+    #[inline(always)]
+    fn parse_number<T>(slice: &str) -> Result<T, Box<dyn core::error::Error>> 
+    where T: core::str::FromStr 
+    {
+        match slice.parse::<T>() {
+            Ok(val) => Ok(val),
+            Err(_) => Err(Error::Parsing(ParseError::InvalidNumberParse('0')).into()),
+        }
+    }
+
     /// Read a number from given input
     /// Returns Error if an unexpected token occurs.
     fn read_number(
@@ -576,11 +586,11 @@ impl Parser {
         };
 
         if read_dot || read_exp {
-            Ok(Container::Decimal(str_slice.parse::<f64>().unwrap()))
+            Ok(Container::Decimal(Self::parse_number(str_slice)?))
         } else if sign == b'-' {
-            Ok(Container::Number(str_slice.parse::<i64>().unwrap()))
+            Ok(Container::Number(Self::parse_number(str_slice)?))
         } else {
-            Ok(Container::Unsigned(str_slice.parse::<u64>().unwrap()))
+            Ok(Container::Unsigned(Self::parse_number(str_slice)?))
         }
     }
 }
