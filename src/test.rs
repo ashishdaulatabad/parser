@@ -105,11 +105,28 @@ mod tests {
         assert!(parse_str("[1.2e-]").is_err());
         assert!(parse_str("[1.2e-++3]").is_err());
         assert!(parse_str("[1 .2e3]").is_err());
-        assert!(parse_str("[1.2e3]").is_ok());
         assert!(parse_str("[.2e3]").is_err());
         assert!(parse_str("[-.1]").is_err());
-        assert!(parse_str("[-0.1]").is_ok());
+        assert!(parse_str("[+0.1]").is_err());
+        assert!(parse_str("[-01]").is_err());
         assert!(parse_str("[.-1]").is_err());
+
+        assert!(
+            parse_str("-0.1").is_ok_and(|c| c.is_decimal_and(|d| d == -0.1))
+        );
+        assert!(parse_str("[1.2e3]").is_ok());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_too_big_nested() -> Result<(), Box<dyn core::error::Error>> {
+        let string: String = "[".repeat(500) + &"]".repeat(500);
+        let ans = parse_str(&string);
+        assert!(ans.is_ok());
+
+        let string: String = "[".repeat(5001) + &"]".repeat(5001);
+        assert!(parse_str(&string).is_err());
 
         Ok(())
     }

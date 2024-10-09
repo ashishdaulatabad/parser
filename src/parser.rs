@@ -3,7 +3,7 @@ use super::error::Error;
 use super::error::ParseError;
 use core::result::Result;
 
-const NEST_LIMIT: u16 = 5000;
+const NEST_LIMIT: u16 = 500;
 
 /// Single-threaded parsing module, with an intent to parse the
 /// files faster with handling run-time errors (hopefully), considering two modes
@@ -482,12 +482,15 @@ impl Parser {
     }
 
     #[inline(always)]
-    fn parse_number<T>(slice: &str) -> Result<T, Box<dyn core::error::Error>> 
-    where T: core::str::FromStr 
+    fn parse_number<T>(slice: &str) -> Result<T, Box<dyn core::error::Error>>
+    where
+        T: core::str::FromStr,
     {
         match slice.parse::<T>() {
             Ok(val) => Ok(val),
-            Err(_) => Err(Error::Parsing(ParseError::InvalidNumberParse('0')).into()),
+            Err(_) => {
+                Err(Error::Parsing(ParseError::InvalidNumberParse('0')).into())
+            }
         }
     }
 
@@ -504,6 +507,7 @@ impl Parser {
             byte_read == b'+' || byte_read == b'-',
         );
         let abrupt_end;
+        let mut is_leading_zero = byte_read == b'0';
         let (mut read_exp, mut sign_exp, start, mut expect_number_after_exp) =
             (false, false, self.offset - 1, false);
 
@@ -515,6 +519,30 @@ impl Parser {
                     )
                     .into());
                 }
+                Some(b'0') if !read_exp && prev_byte == b'-' => {
+                    is_leading_zero = true;
+                    b'0'
+                }
+                val @ Some(b'0'..=b'9')
+                    if is_leading_zero
+                        && prev_byte == b'0'
+                        && (!read_dot && !read_exp) =>
+                {
+                    return Err(Error::Parsing(
+                        ParseError::InvalidNumberParse(val.unwrap() as char),
+                    )
+                    .into());
+                }
+                val @ Some(b'e' | b'E' | b'.')
+                    if is_leading_zero
+                        && prev_byte == b'0'
+                        && (!read_exp && !read_dot) =>
+                {
+                    let chr = val.unwrap();
+                    read_exp |= equals_in!(chr, b'e', b'E');
+                    read_dot |= read_exp || chr == b'.';
+                    chr
+                }
                 val @ Some(b'.' | b'e' | b'E')
                     if (read_exp || prev_byte == b'-') =>
                 {
@@ -524,7 +552,7 @@ impl Parser {
                     .into());
                 }
                 val @ Some(b'-' | b'+')
-                    if (is_sign && equals_in!(prev_byte, b'+', b'-')
+                    if (is_sign && prev_byte == b'-'
                         || read_exp && !equals_in!(prev_byte, b'e', b'E')) =>
                 {
                     return Err(Error::Parsing(ParseError::UnexpectedToken(

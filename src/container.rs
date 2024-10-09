@@ -304,6 +304,83 @@ impl Container {
         }
     }
 
+    #[inline]
+    pub fn is_bool_and<F>(&self, f: F) -> bool
+    where
+        F: Fn(bool) -> bool,
+    {
+        match self {
+            Self::Boolean(val) => f(*val),
+            _ => false,
+        }
+    }
+
+    #[inline]
+    pub fn is_integer_and<F>(&self, f: F) -> bool
+    where
+        F: Fn(i64) -> bool,
+    {
+        match self {
+            Self::Number(val) => f(*val),
+            _ => false,
+        }
+    }
+
+    #[inline]
+    pub fn is_unsigned_and<F>(&self, f: F) -> bool
+    where
+        F: Fn(u64) -> bool,
+    {
+        match self {
+            Self::Unsigned(val) => f(*val),
+            _ => false,
+        }
+    }
+
+    #[inline]
+    pub fn is_decimal_and<F>(&self, f: F) -> bool
+    where
+        F: Fn(f64) -> bool,
+    {
+        match self {
+            Self::Decimal(val) => f(*val),
+            _ => false,
+        }
+    }
+
+    #[inline]
+    pub fn is_string_and<F>(&self, f: F) -> bool
+    where
+        F: Fn(&str) -> bool,
+    {
+        match self {
+            Self::String(val) => f(val),
+            _ => false,
+        }
+    }
+
+    #[inline]
+    pub fn is_object_and<F>(&self, f: F) -> bool
+    where
+        F: Fn(&HashMap<String, Self>) -> bool,
+    {
+        match self {
+            Self::Object(val) => f(val),
+            _ => false,
+        }
+    }
+
+    #[inline]
+    pub fn is_array_and<F>(&self, f: F) -> bool
+    where
+        F: Fn(&[Self]) -> bool,
+    {
+        match self {
+            Self::Array(val) => f(val),
+            _ => false,
+        }
+    }
+
     define_type_checks!(Number, is_number);
 
     define_type_checks!(Unsigned, is_unsigned);
