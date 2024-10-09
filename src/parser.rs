@@ -269,7 +269,7 @@ impl Parser {
             .into());
         }
 
-        let mut array_container = Container::new_array();
+        let mut array_container: Vec<Container> = Vec::new();
         let mut recorded_one = false;
 
         'parsing_array: loop {
@@ -346,7 +346,7 @@ impl Parser {
         }
 
         self.nested_count -= 1;
-        Ok(array_container)
+        Ok(Container::Array(array_container))
     }
 
     /// Parsing through the object.
@@ -361,7 +361,7 @@ impl Parser {
             .into());
         }
 
-        let mut object_container = Container::new_object();
+        let mut object_container = std::collections::HashMap::new();
         let mut recorded_one = false;
         'parsing_objects: loop {
             // First: read the key
@@ -445,10 +445,8 @@ impl Parser {
                 ))
                 .into()),
             }?;
-            object_container.insert_str(
-                verification.get_string().unwrap().as_str(),
-                assoc_value,
-            );
+            object_container
+                .insert(verification.get_string().unwrap(), assoc_value);
             recorded_one = true;
 
             match self.get_byte() {
@@ -478,7 +476,7 @@ impl Parser {
         }
 
         self.nested_count -= 1;
-        Ok(object_container)
+        Ok(Container::Object(object_container))
     }
 
     #[inline(always)]
