@@ -60,9 +60,9 @@ mod tests {
             .is_ok_and(|c| c.get_real().is_some_and(|d| d == 1.4e-8)));
         assert!(parse_str("null").is_ok_and(|c| c.is_null()));
         assert!(parse_str("true")
-            .is_ok_and(|c| c.get_bool().is_some_and(|d| d == true)));
+            .is_ok_and(|c| c.get_boolean().is_some_and(|d| d == true)));
         assert!(parse_str("false")
-            .is_ok_and(|c| c.get_bool().is_some_and(|d| d == false)));
+            .is_ok_and(|c| c.get_boolean().is_some_and(|d| d == false)));
         assert!(parse_str("\"false\"").is_ok_and(|c| c
             .get_string()
             .is_some_and(|d| d == "false".to_owned())));
@@ -165,7 +165,7 @@ mod tests {
 
         assert_eq!(a["i'll"]["you"][1]["parser"].get_string(), None);
 
-        assert_eq!(a["i'll"]["you"][2].get_bool().unwrap(), true);
+        assert_eq!(a["i'll"]["you"][2].get_boolean().unwrap(), true);
         Ok(())
     }
 

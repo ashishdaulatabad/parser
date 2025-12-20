@@ -43,7 +43,7 @@ use std::collections::HashMap;
 /// Todo:
 /// - [ ] Support Date and raw binary data type
 ///
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Container {
     /// Representing an object of null type
     Null,
@@ -66,22 +66,6 @@ pub enum Container {
     Object(HashMap<String, Container>),
 }
 
-impl Clone for Container {
-    /// Creates an exact clone of self.
-    fn clone(&self) -> Self {
-        match self {
-            Self::Number(element) => Self::Number(*element),
-            Self::Unsigned(element) => Self::Unsigned(*element),
-            Self::Decimal(element) => Self::Decimal(*element),
-            Self::Boolean(element) => Self::Boolean(*element),
-            Self::String(element) => Self::String(element.to_owned()),
-            Self::Array(array) => Self::Array(array.clone()),
-            Self::Object(object) => Self::Object(object.clone()),
-            Self::Null => Self::Null,
-        }
-    }
-}
-
 impl Hash for Container {
     fn hash<H: Hasher>(&self, s: &mut H) {
         match self {
@@ -94,17 +78,6 @@ impl Hash for Container {
     }
 }
 
-macro_rules! define_type_checks {
-    ($gen_type:ident, $func:ident) => {
-        pub fn $func(&self) -> bool {
-            match self {
-                Self::$gen_type(_) => true,
-                _ => false,
-            }
-        }
-    };
-}
-
 impl Eq for Container {}
 
 impl PartialEq for Container {
@@ -115,13 +88,13 @@ impl PartialEq for Container {
             (Self::Decimal(this), Self::Decimal(other)) => this == other,
             (Self::Boolean(this), Self::Boolean(other)) => this == other,
             (Self::String(this), Self::String(other)) => this == other,
-            (Self::Array(arr), Self::Array(oarr)) => {
-                arr.len() == oarr.len()
-                    && arr.iter().zip(oarr).all(|(a, b)| a == b)
+            (Self::Array(arr), Self::Array(other)) => {
+                arr.len() == other.len()
+                    && arr.iter().zip(other).all(|(a, b)| a == b)
             }
-            (Self::Object(map), Self::Object(omap)) => {
-                (map.len() == omap.len())
-                    && map.iter().all(|(k, v)| omap.get(k) == Some(v))
+            (Self::Object(map), Self::Object(other)) => {
+                (map.len() == other.len())
+                    && map.iter().all(|(k, v)| other.get(k) == Some(v))
             }
             (Self::Null, Self::Null) => true,
             _ => false,
@@ -137,15 +110,14 @@ impl fmt::Display for Container {
 }
 
 #[allow(unused)]
-/// To do: Implement index
 impl Container {
-    /// Returned New Object
+    /// Returns a new Object
     #[inline(always)]
     pub fn new_object() -> Self {
         Self::Object(HashMap::new())
     }
 
-    /// Returns New Array Object
+    /// Returns a new Array Object
     #[inline(always)]
     pub fn new_array() -> Self {
         Self::Array(Vec::new())
@@ -269,6 +241,15 @@ impl Container {
         }
     }
 
+    #[inline]
+    pub fn get_string_ref(&self) -> Option<&str> {
+        match self {
+            Self::String(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    #[inline]
     pub fn get_string(&self) -> Option<String> {
         match self {
             Self::String(value) => Some(value.to_owned()),
@@ -276,6 +257,7 @@ impl Container {
         }
     }
 
+    #[inline]
     pub fn get_uint(&self) -> Option<u64> {
         match self {
             Self::Unsigned(value) => Some(*value),
@@ -283,6 +265,7 @@ impl Container {
         }
     }
 
+    #[inline]
     pub fn get_int(&self) -> Option<i64> {
         match self {
             Self::Number(value) => Some(*value),
@@ -290,6 +273,7 @@ impl Container {
         }
     }
 
+    #[inline]
     pub fn get_real(&self) -> Option<f64> {
         match self {
             Self::Decimal(value) => Some(*value),
@@ -297,7 +281,8 @@ impl Container {
         }
     }
 
-    pub fn get_bool(&self) -> Option<bool> {
+    #[inline]
+    pub fn get_boolean(&self) -> Option<bool> {
         match self {
             Self::Boolean(value) => Some(*value),
             _ => None,
@@ -305,7 +290,7 @@ impl Container {
     }
 
     #[inline]
-    pub fn is_bool_and<F>(&self, f: F) -> bool
+    pub fn is_boolean_and<F>(&self, f: F) -> bool
     where
         F: Fn(bool) -> bool,
     {
@@ -381,20 +366,63 @@ impl Container {
         }
     }
 
-    define_type_checks!(Number, is_number);
+    #[inline]
+    pub fn is_number(&self) -> bool {
+        match self {
+            Self::Number(_) => true,
+            _ => false,
+        }
+    }
 
-    define_type_checks!(Unsigned, is_unsigned);
+    #[inline]
+    pub fn is_unsigned(&self) -> bool {
+        match self {
+            Self::Unsigned(_) => true,
+            _ => false,
+        }
+    }
 
-    define_type_checks!(Decimal, is_decimal);
+    #[inline]
+    pub fn is_decimal(&self) -> bool {
+        match self {
+            Self::Decimal(_) => true,
+            _ => false,
+        }
+    }
 
-    define_type_checks!(Boolean, is_bool);
+    #[inline]
+    pub fn is_boolean(&self) -> bool {
+        match self {
+            Self::Boolean(_) => true,
+            _ => false,
+        }
+    }
 
-    define_type_checks!(String, is_str);
+    #[inline]
+    pub fn is_string(&self) -> bool {
+        match self {
+            Self::String(_) => true,
+            _ => false,
+        }
+    }
 
-    define_type_checks!(Object, is_object);
+    #[inline]
+    pub fn is_array(&self) -> bool {
+        match self {
+            Self::Array(_) => true,
+            _ => false,
+        }
+    }
 
-    define_type_checks!(Array, is_array);
+    #[inline]
+    pub fn is_object(&self) -> bool {
+        match self {
+            Self::Object(_) => true,
+            _ => false,
+        }
+    }
 
+    #[inline]
     pub fn is_null(&self) -> bool {
         *self == Self::Null
     }
